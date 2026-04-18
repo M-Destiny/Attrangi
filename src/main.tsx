@@ -911,10 +911,13 @@ const app = {
         </aside>
 
         <!-- Main Area -->
-        <main class="main-content">
-          <div id="view-root">
+        <main class="main-content flex flex-col min-h-[100dvh]">
+          <div id="view-root" class="flex-1">
              ${views[state.currentView]()}
           </div>
+          <footer class="py-8 mt-12 text-center text-xs opacity-40 hover:opacity-100 transition-opacity font-bold tracking-widest uppercase">
+            Made with ❤️ by <a href="https://github.com/M-Destiny" target="_blank" class="text-primary underline decoration-primary/30 underline-offset-4">Destiny</a>
+          </footer>
         </main>
 
         <!-- Bottom Nav (Mobile) -->
