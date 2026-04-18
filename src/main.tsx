@@ -1545,7 +1545,7 @@ const app = {
                  <p style="font-weight: 800; font-size: 0.9rem;">₹${inv.amount.toLocaleString('en-IN')}</p>
               </div>
               <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem; padding: 0 1rem;">
-                 <p style="color: #666; font-size: 0.9rem;">Tax / GST (18%)</p>
+                 <p style="color: #666; font-size: 0.9rem;">Tax / GST</p>
                  <p style="font-weight: 800; font-size: 0.9rem;">₹0.00</p>
               </div>
               <div style="background: #1a1a1a; color: white; padding: 2rem; border-radius: 1rem; display: flex; justify-content: space-between; align-items: center;">
@@ -1558,7 +1558,7 @@ const app = {
             </div>
           </div>
 
-          <div style="margin-top: 4rem; padding: 2rem; border: 1px dashed #eee; border-radius: 1rem;">
+          <div style="margin-top: 4rem; padding: 2rem; border: 1px dashed #eee; border-radius: 1rem; page-break-inside: avoid; break-inside: avoid;">
             <p style="font-size: 0.75rem; font-weight: 800; margin-bottom: 0.5rem; text-transform: uppercase; tracking: 0.1em;">Terms & Conditions</p>
             <p style="font-size: 0.65rem; color: #888; line-height: 1.6;">
               1. This invoice is subject to Attrangii's Master Service Agreement.<br>
@@ -1568,7 +1568,7 @@ const app = {
             </p>
           </div>
 
-          <div style="margin-top: 6rem; text-align: center;">
+          <div style="margin-top: 6rem; text-align: center; page-break-inside: avoid; break-inside: avoid;">
              <p style="font-size: 0.75rem; color: #999; font-weight: 700;">Thank you for choosing ATTRANGII.</p>
              <div style="width: 4rem; height: 4px; background: #E87AAE; margin: 1.5rem auto 0;"></div>
           </div>
