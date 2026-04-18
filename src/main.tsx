@@ -424,12 +424,16 @@ const views: any = {
                     </tr>
                   </thead>
                   <tbody>
+                    ${(inv.items || []).length === 0 ? `
+                      <tr><td colspan="4" class="text-center py-4 opacity-50">No items on this invoice</td></tr>
+                    ` : (inv.items || []).map((item: any) => `
                     <tr>
-                      <td>Premium CRM Access</td>
-                      <td class="text-center">1</td>
-                      <td class="text-right">₹${inv.amount.toLocaleString('en-IN')}</td>
-                      <td class="text-right font-bold">₹${inv.amount.toLocaleString('en-IN')}</td>
+                      <td class="font-bold">${item.description}</td>
+                      <td class="text-center">${item.quantity}</td>
+                      <td class="text-right">₹${item.unit_price.toLocaleString('en-IN')}</td>
+                      <td class="text-right font-black text-primary">₹${item.total_price.toLocaleString('en-IN')}</td>
                     </tr>
+                    `).join('')}
                   </tbody>
                </table>
                </div>
@@ -1478,15 +1482,16 @@ const app = {
               </tr>
             </thead>
             <tbody>
+              ${(inv.items || []).map((item: any) => `
               <tr>
                 <td style="padding: 2rem 1rem; border-bottom: 1px solid #eee;">
-                  <p style="font-weight: 800; font-size: 1rem; margin: 0;">Premium CRM Cloud Suite</p>
-                  <p style="font-size: 0.75rem; color: #666; margin: 0.25rem 0 0;">Annual Enterprise Subscription (Multi-User License)</p>
+                  <p style="font-weight: 800; font-size: 1rem; margin: 0;">${item.description}</p>
                 </td>
-                <td style="padding: 2rem 1rem; text-align: center; border-bottom: 1px solid #eee; font-weight: 800;">1</td>
-                <td style="padding: 2rem 1rem; text-align: right; border-bottom: 1px solid #eee; font-weight: 800;">₹${inv.amount.toLocaleString('en-IN')}</td>
-                <td style="padding: 2rem 1rem; text-align: right; border-bottom: 1px solid #eee; font-weight: 900; font-size: 1.1rem;">₹${inv.amount.toLocaleString('en-IN')}</td>
+                <td style="padding: 2rem 1rem; text-align: center; border-bottom: 1px solid #eee; font-weight: 800;">${item.quantity}</td>
+                <td style="padding: 2rem 1rem; text-align: right; border-bottom: 1px solid #eee; font-weight: 800;">₹${item.unit_price.toLocaleString('en-IN')}</td>
+                <td style="padding: 2rem 1rem; text-align: right; border-bottom: 1px solid #eee; font-weight: 900; font-size: 1.1rem;">₹${item.total_price.toLocaleString('en-IN')}</td>
               </tr>
+              `).join('')}
             </tbody>
           </table>
 
