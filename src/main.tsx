@@ -595,6 +595,7 @@ const views: any = {
              <button type="submit" class="btn btn-primary w-full py-4 rounded-xl" id="auth-submit">Enter Workspace</button>
           </form>
 
+          <!-- 
           <div class="mt-12 pt-8 border-t border-outline-variant text-center">
              <p class="text-[10px] text-on-surface-variant mb-6 font-black uppercase tracking-widest opacity-60">System Provisioning</p>
              <button onclick="app.handlers.seedInitialUsers()" class="btn w-full" style="border: 1px solid var(--outline); font-size: 0.65rem; border-radius: 1rem; padding: 1rem;">
@@ -607,6 +608,7 @@ const views: any = {
              </div>
              <p class="text-[10px] mt-6 opacity-40 font-bold">Standard Password: attrangii123</p>
           </div>
+          -->
        </div>
     </div>
   `,
