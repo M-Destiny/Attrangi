@@ -194,6 +194,105 @@ const exampleProducts = [
     selling_price: 280,
     buying_price: 0,
     stock_level: 5
+  },
+  {
+    name: "ATPM02",
+    sku: "ATPM02",
+    category: "Pins",
+    brand: "Attrangii",
+    selling_price: 300,
+    buying_price: 0,
+    stock_level: 5
+  },
+  {
+    name: "ATPM03",
+    sku: "ATPM03",
+    category: "Pins",
+    brand: "Attrangii",
+    selling_price: 300,
+    buying_price: 0,
+    stock_level: 5
+  },
+  {
+    name: "ATPM04",
+    sku: "ATPM04",
+    category: "Pins",
+    brand: "Attrangii",
+    selling_price: 280,
+    buying_price: 0,
+    stock_level: 5
+  },
+  {
+    name: "ATPM05",
+    sku: "ATPM05",
+    category: "Pins",
+    brand: "Attrangii",
+    selling_price: 280,
+    buying_price: 0,
+    stock_level: 5
+  },
+  {
+    name: "ATPM06",
+    sku: "ATPM06",
+    category: "Pins",
+    brand: "Attrangii",
+    selling_price: 420,
+    buying_price: 0,
+    stock_level: 5
+  },
+  {
+    name: "ATHP01",
+    sku: "ATHP01",
+    category: "Pins",
+    brand: "Attrangii",
+    selling_price: 300,
+    buying_price: 0,
+    stock_level: 5
+  },
+  {
+    name: "ATHP02",
+    sku: "ATHP02",
+    category: "Pins",
+    brand: "Attrangii",
+    selling_price: 280,
+    buying_price: 0,
+    stock_level: 5
+  },
+  {
+    name: "ATHP03",
+    sku: "ATHP03",
+    category: "Pins",
+    brand: "Attrangii",
+    selling_price: 280,
+    buying_price: 0,
+    stock_level: 5
+  },
+  {
+    name: "ATHP04",
+    sku: "ATHP04",
+    category: "Pins",
+    brand: "Attrangii",
+    selling_price: 280,
+    buying_price: 0,
+    stock_level: 5
+  },
+  {
+    name: "ATTX08",
+    sku: "ATTX08",
+    category: "Pins",
+    brand: "Attrangii",
+    selling_price: 350,
+    buying_price: 0,
+    stock_level: 5
+  },
+  {
+    name: "ATPM07",
+    sku: "ATPM07",
+    category: "Pins",
+    brand: "Attrangii",
+    selling_price: 280,
+    buying_price: 0,
+    stock_level: 5
   }
 ];
 
