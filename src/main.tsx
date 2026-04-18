@@ -100,7 +100,7 @@ const state: any = {
   currentInvoice: {
     items: [],
     discount: 0,
-    taxRate: 18,
+    taxRate: 0,
   },
   invoiceProductSearch: '',
 };
@@ -449,7 +449,7 @@ const views: any = {
                      <span class="font-bold">₹${inv.amount.toLocaleString('en-IN')}</span>
                   </div>
                   <div class="flex justify-between">
-                     <span class="text-on-surface-variant">Tax (18%)</span>
+                     <span class="text-on-surface-variant">Tax</span>
                      <span class="font-bold">₹0</span>
                   </div>
                   <div class="pt-4 border-t border-outline-variant flex justify-between items-end">
@@ -749,7 +749,7 @@ const views: any = {
                     <span class="text-[9px] font-bold text-on-surface-variant">Standard Percentage</span>
                  </div>
                  <div class="flex items-center gap-2 bg-surface-container-highest/40 rounded-xl px-3 py-1">
-                    <input type="number" value="${inv.taxRate || 18}" style="width: 3rem; text-align: right; border: none; font-weight: 900; background: transparent; padding: 0.5rem 0;" oninput="app.handlers.handleUpdateInvoiceHeader('taxRate', parseFloat(this.value) || 0, true)">
+                    <input type="number" value="${inv.taxRate !== undefined ? inv.taxRate : 0}" style="width: 3rem; text-align: right; border: none; font-weight: 900; background: transparent; padding: 0.5rem 0;" oninput="app.handlers.handleUpdateInvoiceHeader('taxRate', parseFloat(this.value) || 0, true)">
                     <span class="text-xs opacity-40 font-bold">%</span>
                  </div>
               </div>
@@ -1230,6 +1230,24 @@ const app = {
       const submitBtn = document.getElementById('save-invoice-btn');
       if (submitBtn) (submitBtn as HTMLButtonElement).disabled = true;
 
+      // Check stock levels
+      const outOfStockItems = [];
+      for (const item of state.currentInvoice.items) {
+         if (!item.product_id) continue;
+         const prod = state.products.find((p: any) => p.id === item.product_id);
+         if (prod && item.qty > prod.stock_level) {
+            outOfStockItems.push(`${prod.name} (Requested: ${item.qty}, Available: ${prod.stock_level})`);
+         }
+      }
+
+      if (outOfStockItems.length > 0) {
+         const msg = "The following items exceed available stock:\\n" + outOfStockItems.join('\\n') + "\\n\\nCreate invoice anyway?";
+         if (!confirm(msg)) {
+            if (submitBtn) (submitBtn as HTMLButtonElement).disabled = false;
+            return;
+         }
+      }
+
       try {
         let customerId = state.currentInvoice.customer_id;
 
@@ -1278,6 +1296,17 @@ const app = {
         const { error: itemsErr } = await supabase.from('invoice_items').insert(itemsToInsert);
         if (itemsErr) throw itemsErr;
 
+        // Update stock levels
+        for (const item of state.currentInvoice.items) {
+           if (!item.product_id) continue;
+           const prod = state.products.find((p: any) => p.id === item.product_id);
+           if (prod) {
+              const newStock = Math.max(0, prod.stock_level - item.qty);
+              await supabase.from('products').update({ stock_level: newStock }).eq('id', prod.id);
+              prod.stock_level = newStock;
+           }
+        }
+
         alert('Invoice created successfully! Persisted to database.');
         
         // Refresh local data to show new invoice on dashboard
@@ -1285,9 +1314,9 @@ const app = {
         
         // Reset state
         state.currentInvoice = {
-          items: [{ id: Date.now(), description: 'Executive Consultation', qty: 1, price: 12000 }],
+          items: [],
           discount: 0,
-          taxRate: 18,
+          taxRate: 0,
         };
 
         app.router.navigate('invoices');
