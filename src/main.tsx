@@ -349,12 +349,22 @@ const views: any = {
                 <td>${inv.date}</td>
                 <td class="font-bold">₹${inv.amount.toLocaleString('en-IN')}</td>
                 <td>
-                  <select onchange="app.handlers.handleUpdateInvoiceStatus('${inv.id}', this.value)" class="text-xs px-2 py-1 rounded-full border-none font-bold" style="background: ${inv.status === 'Paid' ? 'var(--secondary-container)' : inv.status === 'Unpaid' ? 'var(--error-container)' : 'var(--surface-container-highest)'}">
-                    <option value="Paid" ${inv.status === 'Paid' ? 'selected' : ''}>Paid</option>
-                    <option value="Unpaid" ${inv.status === 'Unpaid' ? 'selected' : ''}>Unpaid</option>
-                    <option value="Partial" ${inv.status === 'Partial' ? 'selected' : ''}>Partial</option>
-                    <option value="Draft" ${inv.status === 'Draft' ? 'selected' : ''}>Draft</option>
-                  </select>
+                  <div class="flex gap-2 items-center">
+                    <select onchange="app.handlers.handleUpdateInvoiceStatus('${inv.id}', this.value)" class="text-xs px-2 py-1 rounded-full border-none font-bold" style="background: ${inv.status === 'Paid' ? 'var(--secondary-container)' : inv.status === 'Unpaid' ? 'var(--error-container)' : 'var(--surface-container-highest)'}">
+                      <option value="Paid" ${inv.status === 'Paid' ? 'selected' : ''}>Paid</option>
+                      <option value="Unpaid" ${inv.status === 'Unpaid' ? 'selected' : ''}>Unpaid</option>
+                      <option value="Partial" ${inv.status === 'Partial' ? 'selected' : ''}>Partial</option>
+                      <option value="Draft" ${inv.status === 'Draft' ? 'selected' : ''}>Draft</option>
+                    </select>
+                    ${inv.status === 'Paid' ? `
+                    <select onchange="app.handlers.handleUpdateInvoicePaidTo('${inv.id}', this.value)" class="text-xs px-2 py-1 rounded-full border-none font-bold bg-surface-container-highest max-w-[100px]">
+                      <option value="">Paid To</option>
+                      <option value="MEHUL" ${inv.paid_to === 'MEHUL' ? 'selected' : ''}>MEHUL</option>
+                      <option value="SIMARPREET" ${inv.paid_to === 'SIMARPREET' ? 'selected' : ''}>SIMARPREET</option>
+                      <option value="DALBIR" ${inv.paid_to === 'DALBIR' ? 'selected' : ''}>DALBIR</option>
+                    </select>
+                    ` : ''}
+                  </div>
                 </td>
                 <td>
                   <button class="btn opacity-60 hover:opacity-100" onclick="app.handlers.handleSelectInvoice('${inv.id}')">
@@ -1043,6 +1053,8 @@ const app = {
         *,
         customers (name)
       `).order('created_at', { ascending: false });
+      // Fetch items for top selling logic and invoice view
+      const { data: items } = await supabase.from('invoice_items').select('*');
       
       state.invoices = (invs || []).map((i: any) => ({
          id: i.invoice_number,
@@ -1051,11 +1063,14 @@ const app = {
          date: new Date(i.issue_date).toLocaleDateString(),
          amount: i.total_amount,
          status: i.status.charAt(0).toUpperCase() + i.status.slice(1),
-         paid_to: i.paid_to
+         paid_to: i.paid_to,
+         items: (items || []).filter((item: any) => item.invoice_id === i.id).map((item: any) => ({
+            description: item.description || (state.products.find((p: any) => p.id === item.product_id)?.name || 'Unknown Product'),
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total_price: item.total_price
+         }))
       }));
-
-      // Fetch items for top selling logic
-      const { data: items } = await supabase.from('invoice_items').select('*');
 
       // Stats calculation
       state.stats.inventoryValue = (prods || []).reduce((acc: any, p: any) => acc + (p.selling_price * p.stock_level), 0);
