@@ -77,9 +77,11 @@ const state: any = {
   editingProductId: null,
   isInitializing: false,
   stats: {
-    inventoryValue: 1024500,
-    salesMtd: 482900,
-    lowStock: 14,
+    inventoryValue: 0,
+    salesMtd: 0,
+    lowStock: 0,
+    topSelling: [],
+    chartData: []
   },
   products: [],
   invoices: [],
@@ -153,12 +155,9 @@ const views: any = {
           <button class="btn btn-outline" onclick="app.router.navigate('analytics')">View Full Report</button>
        </div>
        <div class="bar-chart">
-          <div class="bar" style="height: 40%" data-label="Jan"></div>
-          <div class="bar" style="height: 60%" data-label="Feb"></div>
-          <div class="bar" style="height: 45%" data-label="Mar"></div>
-          <div class="bar active" style="height: 85%" data-label="Apr"></div>
-          <div class="bar" style="height: 70%" data-label="May"></div>
-          <div class="bar" style="height: 50%" data-label="Jun"></div>
+          ${(state.stats.chartData || []).map((d: any) => `
+             <div class="bar ${d.isCurrent ? 'active' : ''}" style="height: ${Math.max(5, d.height)}%" data-label="${d.label}"></div>
+          `).join('')}
        </div>
     </div>
 
@@ -196,26 +195,18 @@ const views: any = {
        <div class="card" style="flex: 1">
           <h3 class="font-bold text-xl mb-6">Top Selling</h3>
           <ul class="flex flex-col gap-4">
-             <li class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-primary">
-                    ${ICONS.inventory}
-                </div>
-                <div>
-                   <p class="font-bold text-sm">Premium Headphones</p>
-                   <p class="text-xs text-on-surface-variant">124 sold</p>
-                </div>
-                <div class="ml-auto font-bold">₹29,900</div>
-             </li>
-             <li class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-secondary">
-                    ${ICONS.inventory}
-                </div>
-                <div>
-                   <p class="font-bold text-sm">Smart Watch Series 4</p>
-                   <p class="text-xs text-on-surface-variant">98 sold</p>
-                </div>
-                <div class="ml-auto font-bold">₹19,900</div>
-             </li>
+             ${(state.stats.topSelling || []).map((ts: any) => `
+               <li class="flex items-center gap-4">
+                  <div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-primary overflow-hidden">
+                      ${ts.image ? `<img src="${ts.image}" class="w-full h-full object-cover">` : ICONS.inventory}
+                  </div>
+                  <div>
+                     <p class="font-bold text-sm">${ts.name}</p>
+                     <p class="text-xs text-on-surface-variant">${ts.qty > 0 ? `${ts.qty} sold` : 'New arrival'}</p>
+                  </div>
+                  <div class="ml-auto font-bold">₹${ts.price.toLocaleString('en-IN')}</div>
+               </li>
+             `).join('')}
           </ul>
        </div>
     </div>
@@ -1059,9 +1050,59 @@ const app = {
          paid_to: i.paid_to
       }));
 
+      // Fetch items for top selling logic
+      const { data: items } = await supabase.from('invoice_items').select('*');
+
       // Stats calculation
       state.stats.inventoryValue = (prods || []).reduce((acc: any, p: any) => acc + (p.selling_price * p.stock_level), 0);
       state.stats.lowStock = (prods || []).filter((p: any) => p.stock_level < p.low_stock_threshold).length;
+      
+      // Calculate MTD Sales
+      const now = new Date();
+      state.stats.salesMtd = (invs || []).reduce((acc: any, inv: any) => {
+         const d = new Date(inv.issue_date);
+         if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+             return acc + Number(inv.total_amount || 0);
+         }
+         return acc;
+      }, 0);
+
+      // Top Selling
+      const itemCounts: any = {};
+      (items || []).forEach((item: any) => {
+         itemCounts[item.product_id] = (itemCounts[item.product_id] || 0) + item.quantity;
+      });
+      state.stats.topSelling = Object.entries(itemCounts)
+         .sort((a: any, b: any) => b[1] - a[1])
+         .slice(0, 3)
+         .map(([pid, qty]) => {
+            const p = state.products.find((prod: any) => prod.id === pid);
+            return p ? { name: p.name, qty, price: p.selling_price, image: p.image_url } : null;
+         })
+         .filter(Boolean);
+      
+      // Fallback
+      if (state.stats.topSelling.length === 0) {
+         state.stats.topSelling = [...state.products].sort((a: any, b: any) => b.selling_price - a.selling_price).slice(0, 3).map((p: any) => ({
+            name: p.name, qty: 0, price: p.selling_price, image: p.image_url
+         }));
+      }
+
+      // Chart Data (Last 6 months)
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const chartData = [];
+      let maxMonthSales = 0;
+      for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const monthSales = (invs || []).reduce((acc: any, inv: any) => {
+             const idate = new Date(inv.issue_date);
+             if (idate.getMonth() === d.getMonth() && idate.getFullYear() === d.getFullYear()) return acc + Number(inv.total_amount || 0);
+             return acc;
+          }, 0);
+          if (monthSales > maxMonthSales) maxMonthSales = monthSales;
+          chartData.push({ label: months[d.getMonth()], sales: monthSales, isCurrent: i === 0 });
+      }
+      state.stats.chartData = chartData.map((d: any) => ({ ...d, height: maxMonthSales > 0 ? (d.sales / maxMonthSales * 100) : 0 }));
       
       app.render();
     },
