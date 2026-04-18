@@ -1442,7 +1442,6 @@ const app = {
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4rem; border-bottom: 8px solid #E87AAE; padding-bottom: 2rem;">
             <div>
               <h1 style="font-size: 3rem; font-weight: 900; letter-spacing: -2px; margin: 0; color: #1a1a1a;">ATTRANGII</h1>
-              <p style="color: #666; font-size: 0.7rem; text-transform: uppercase; tracking: 0.2em; margin: 0.5rem 0 0;">Executive Enterprise Portal</p>
               <div style="margin-top: 2rem; font-size: 0.8rem; color: #444;">
                 <p>123 Business Avenue, Suite 500</p>
                 <p>Digital District, Mumbai - 400001</p>
@@ -1460,15 +1459,10 @@ const app = {
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; margin-bottom: 4rem;">
-            <div style="background: #F8F9FA; padding: 2rem; border-radius: 1rem;">
+          <div style="margin-bottom: 4rem;">
+            <div style="background: #F8F9FA; padding: 2rem; border-radius: 1rem; max-width: 50%;">
               <p style="text-transform: uppercase; font-size: 0.6rem; color: #999; font-weight: 900; tracking: 0.1em; margin-bottom: 1rem;">Recipient Information</p>
-              <p style="font-weight: 800; font-size: 1.25rem; margin-bottom: 0.5rem;">${inv.customer}</p>
-              <p style="color: #666; font-size: 0.85rem; line-height: 1.6;">Client ID: CID-009822<br>Premium Membership Level: Platinum<br>Email: billing@client.com</p>
-            </div>
-            <div style="padding: 2rem;">
-              <p style="text-transform: uppercase; font-size: 0.6rem; color: #999; font-weight: 900; tracking: 0.1em; margin-bottom: 1rem;">Payment Details</p>
-              <p style="font-size: 0.85rem; color: #444;">Bank Name: HDFC Bank Limited<br>A/C No: 50200012345678<br>IFSC: HDFC0001234<br>Branch: Nariman Point, Mumbai</p>
+              <p style="font-weight: 800; font-size: 1.25rem; margin: 0;">${inv.customer}</p>
             </div>
           </div>
 
@@ -1526,7 +1520,7 @@ const app = {
           </div>
 
           <div style="margin-top: 6rem; text-align: center;">
-             <p style="font-size: 0.75rem; color: #999; font-weight: 700;">Thank you for choice ATTRANGII for your executive CRM needs.</p>
+             <p style="font-size: 0.75rem; color: #999; font-weight: 700;">Thank you for choosing ATTRANGII.</p>
              <div style="width: 4rem; height: 4px; background: #E87AAE; margin: 1.5rem auto 0;"></div>
           </div>
         </div>
