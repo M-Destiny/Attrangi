@@ -6,6 +6,7 @@ import './index.css';
 import { supabase } from './lib/supabase';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
+import logoUrl from './assets/logo.png';
 
 // --- Assets ---
 const ICONS = {
@@ -337,7 +338,7 @@ const views: any = {
             <th>Customer</th>
             <th>Date</th>
             <th>Amount</th>
-            <th>Status</th>
+            <th>Status / Paid To</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -1485,10 +1486,11 @@ const app = {
         <div style="font-family: 'Plus Jakarta Sans', sans-serif;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4rem; border-bottom: 8px solid #E87AAE; padding-bottom: 2rem;">
             <div>
-              <h1 style="font-size: 3rem; font-weight: 900; letter-spacing: -2px; margin: 0; color: #1a1a1a;">ATTRANGII</h1>
-              <div style="margin-top: 2rem; font-size: 0.8rem; color: #444;">
-                <p>123 Business Avenue, Suite 500</p>
-                <p>Digital District, Mumbai - 400001</p>
+              <div style="display: flex; align-items: center; gap: 1rem;">
+                <img src="${logoUrl}" alt="Logo" style="height: 3.5rem; object-fit: contain;">
+                <h1 style="font-size: 3rem; font-weight: 900; letter-spacing: -2px; margin: 0; color: #1a1a1a;">ATTRANGII</h1>
+              </div>
+              <div style="margin-top: 1rem; font-size: 0.8rem; color: #444;">
                 <p>GSTIN: 27AAAAA0000A1Z5</p>
               </div>
             </div>
