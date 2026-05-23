@@ -4,12 +4,17 @@ A modern, premium Executive Enterprise Portal and CRM built for Attrangii to str
 
 ## ✨ Features
 
-- **Dynamic Dashboard**: Real-time insights including Month-to-Date (MTD) sales, a 6-month revenue chart, top-selling products, and low stock alerts.
+- **Dynamic Dashboard**: Real-time insights including Month-to-Date (MTD) sales, a dynamic monthly revenue chart, top-selling products, and low stock alerts.
+- **Interactive Revenue Momentum Chart**: Dynamic, actual-data-driven bar chart rendering based on real monthly billing statistics.
 - **Inventory Management**: Add, view, and track product stock levels, SKUs, and pricing.
-- **Smart Invoice Generation**: 
-  - Searchable dropdowns for quick product selection.
-  - Automatic stock deduction upon invoice creation.
-  - Out-of-stock warnings with override capabilities.
+- **Comprehensive Invoice Lifecycle (Create, Edit, Delete)**:
+  - **Smart Invoice Generation**: Searchable dropdowns for quick product selection, automated billing formulas, and instant draft updates.
+  - **Full Edit Mode**: Re-populate invoice forms, modify items, quantities, client info, tax, or discounts, and persist changes directly to the database.
+  - **Safe Deletion Mode**: Delete invoices securely with cascading cleanup in database records.
+- **Inventory Sync & Stock Safeguards**:
+  - **Automatic Stock Deductions**: Deducts item stock levels immediately upon new invoice creation.
+  - **Stock Restorations on Update/Delete**: Automatically restores previous stock allocations back to active inventory when an invoice is edited or deleted.
+  - **Intelligent Stock Validation**: Factoring in already-allocated quantities when validating stock levels during updates, ensuring users are never blocked by their own invoice's stock allocation.
 - **Professional PDF Export**: Generate clean, dynamic, and professional tax invoices for clients directly from the portal.
 - **Payment Tracking**: Track which team member (Mehul, Simarpreet, or Dalbir) received payments for paid invoices.
 - **Real-time Database**: Powered by Supabase for instant data synchronization and secure authentication.

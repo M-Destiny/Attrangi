@@ -104,6 +104,8 @@ const state: any = {
     taxRate: 0,
   },
   invoiceProductSearch: '',
+  editingInvoiceDbId: null,
+  editingInvoiceNumber: null,
 };
 
 // --- View Definitions ---
@@ -191,8 +193,7 @@ const views: any = {
               </tbody>
             </table>
           </div>
-    </div>
-   </div>
+       </div>
        <div class="card" style="flex: 1">
           <h3 class="font-bold text-xl mb-6">Top Selling</h3>
           <ul class="flex flex-col gap-4">
@@ -327,7 +328,7 @@ const views: any = {
     <h2 class="font-black text-4xl md:text-5xl">Billing & Invoices</h2>
     <p class="text-on-surface-variant mt-2">Professional invoice generation and tracking.</p>
   </div>
-  <button class="btn btn-primary w-full md:w-auto" onclick="app.router.navigate('create-invoice')">${ICONS.add} Create Invoice</button>
+  <button class="btn btn-primary w-full md:w-auto" onclick="app.handlers.handleNewInvoice()">${ICONS.add} Create Invoice</button>
 </div>
     <div class="card mt-8 overflow-hidden">
       <div class="overflow-x-auto">
@@ -367,11 +368,13 @@ const views: any = {
                     ` : ''}
                   </div>
                 </td>
-                <td>
-                  <button class="btn opacity-60 hover:opacity-100" onclick="app.handlers.handleSelectInvoice('${inv.id}')">
-                    View
-                  </button>
-                </td>
+                 <td>
+                  <div class="flex gap-2 items-center">
+                    <button class="btn btn-outline btn-xs opacity-80 hover:opacity-100" onclick="app.handlers.handleSelectInvoice('${inv.id}')">View</button>
+                    <button class="btn btn-outline btn-xs opacity-80 hover:opacity-100" onclick="app.handlers.handleEditInvoice('${inv.id}')">Edit</button>
+                    <button class="btn btn-error btn-xs opacity-85 hover:opacity-100" onclick="app.handlers.handleDeleteInvoice('${inv.id}')">Delete</button>
+                  </div>
+                 </td>
              </tr>
            `).join('')}
         </tbody>
@@ -391,8 +394,10 @@ const views: any = {
           <h2 class="font-black text-4xl md:text-5xl">Invoice ${inv.id}</h2>
           <p class="text-on-surface-variant mt-2">Client: ${inv.customer} • Issued on ${inv.date}</p>
         </div>
-        <div class="flex gap-4 w-full md:w-auto mt-4 md:mt-0">
+        <div class="flex gap-4 w-full md:w-auto mt-4 md:mt-0 flex-wrap">
            <button class="btn btn-outline flex-1 md:flex-none" onclick="window.print()">Print</button>
+           <button class="btn btn-outline flex-1 md:flex-none" onclick="app.handlers.handleEditInvoice('${inv.id}')">Edit Invoice</button>
+           <button class="btn btn-error flex-1 md:flex-none" onclick="app.handlers.handleDeleteInvoice('${inv.id}')">Delete</button>
            <button class="btn btn-primary flex-1 md:flex-none" onclick="app.handlers.handleGeneratePDF('${inv.id}')">Generate PDF</button>
         </div>
       </div>
@@ -497,7 +502,7 @@ const views: any = {
               <p class="font-bold">Add New Product</p>
               <p class="text-[10px] text-on-surface-variant uppercase tracking-wider mt-1">Direct Catalog Entry</p>
            </div>
-           <div class="card hover:border-primary transition-all cursor-pointer group" onclick="app.router.navigate('create-invoice')">
+           <div class="card hover:border-primary transition-all cursor-pointer group" onclick="app.handlers.handleNewInvoice()">
               <div class="stat-icon mb-4 group-hover:scale-110 transition-transform" style="background: var(--secondary-container); color: var(--secondary)">${ICONS.invoices}</div>
               <p class="font-bold">Create Invoice</p>
               <p class="text-[10px] text-on-surface-variant uppercase tracking-wider mt-1">Financial Billing</p>
@@ -531,10 +536,9 @@ const views: any = {
        <div class="card">
           <h3 class="font-bold text-xl mb-8">Revenue Momentum</h3>
           <div class="bar-chart">
-            <div class="bar" style="height: 30%" data-label="Oct"></div>
-            <div class="bar" style="height: 50%" data-label="Nov"></div>
-            <div class="bar" style="height: 80%" data-label="Dec"></div>
-            <div class="bar active" style="height: 95%" data-label="Jan"></div>
+             ${(state.stats.chartData || []).map((d: any) => `
+                <div class="bar ${d.isCurrent ? 'active' : ''}" style="height: ${Math.max(5, d.height)}%" data-label="${d.label}"></div>
+             `).join('')}
           </div>
        </div>
        <div class="card">
@@ -619,12 +623,12 @@ const views: any = {
     return `
     <div class="view-header flex justify-between items-start md:items-end p-6 bg-surface-container-low rounded-3xl mb-8">
       <div>
-        <h2 class="font-black text-4xl md:text-5xl">Create Invoice</h2>
-        <p class="text-on-surface-variant mt-2">Professional Financial Instrument • Draft Session</p>
+        <h2 class="font-black text-4xl md:text-5xl">${state.editingInvoiceDbId ? 'Edit Invoice' : 'Create Invoice'}</h2>
+        <p class="text-on-surface-variant mt-2">${state.editingInvoiceDbId ? `Modifying Invoice #${state.editingInvoiceNumber}` : 'Professional Financial Instrument • Draft Session'}</p>
       </div>
       <div class="flex gap-4 w-full md:w-auto mt-4 md:mt-0">
          <button class="btn btn-outline flex-1 md:flex-none" onclick="app.router.navigate('invoices')">Cancel</button>
-         <button class="btn btn-primary flex-1 md:flex-none shadow-lg shadow-primary/20" id="save-invoice-btn" onclick="app.handlers.handleSaveInvoice()">Confirm & Send</button>
+         <button class="btn btn-primary flex-1 md:flex-none shadow-lg shadow-primary/20" id="save-invoice-btn" onclick="app.handlers.handleSaveInvoice()">${state.editingInvoiceDbId ? 'Update & Save' : 'Confirm & Send'}</button>
       </div>
     </div>
 
@@ -787,7 +791,7 @@ const views: any = {
                  </div>
               </div>
               <button class="btn btn-primary w-full py-5 rounded-2xl shadow-xl shadow-primary/30 flex items-center justify-center gap-3" onclick="app.handlers.handleSaveInvoice()">
-                 <span>Finalize & Persist Entry</span>
+                 <span>${state.editingInvoiceDbId ? 'Update & Save' : 'Finalize & Persist Entry'}</span>
                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
               </button>
            </div>
@@ -1066,14 +1070,21 @@ const app = {
          id: i.invoice_number,
          db_id: i.id,
          customer: i.customers?.name || 'Walk-in Client',
+         customer_id: i.customer_id,
+         discount: i.discount_amount || 0,
+         taxRate: i.tax_rate || 0,
          date: new Date(i.issue_date).toLocaleDateString(),
          amount: i.total_amount,
          status: i.status.charAt(0).toUpperCase() + i.status.slice(1),
          paid_to: i.paid_to,
          items: (items || []).filter((item: any) => item.invoice_id === i.id).map((item: any) => ({
+            id: item.id,
+            product_id: item.product_id,
             description: item.description || (state.products.find((p: any) => p.id === item.product_id)?.name || 'Unknown Product'),
             quantity: item.quantity,
+            qty: item.quantity,
             unit_price: item.unit_price,
+            price: item.unit_price,
             total_price: item.total_price
          }))
       }));
@@ -1130,6 +1141,83 @@ const app = {
       state.stats.chartData = chartData.map((d: any) => ({ ...d, height: maxMonthSales > 0 ? (d.sales / maxMonthSales * 100) : 0 }));
       
       app.render();
+    },
+
+    handleNewInvoice: () => {
+      state.currentInvoice = {
+        items: [],
+        discount: 0,
+        taxRate: 0,
+      };
+      state.editingInvoiceDbId = null;
+      state.editingInvoiceNumber = null;
+      app.router.navigate('create-invoice');
+    },
+
+    handleEditInvoice: (invoiceNumber: string) => {
+      const inv = state.invoices.find((i: any) => i.id === invoiceNumber);
+      if (!inv) return;
+
+      // Populate draft fields
+      state.currentInvoice = {
+        customer_id: inv.customer_id || '',
+        new_customer_name: '',
+        discount: inv.discount || 0,
+        taxRate: inv.taxRate || 0,
+        items: inv.items.map((item: any) => ({
+          id: item.id || Date.now() + Math.random(),
+          description: item.description,
+          qty: item.qty || item.quantity,
+          price: item.price || item.unit_price,
+          product_id: item.product_id
+        }))
+      };
+
+      state.editingInvoiceDbId = inv.db_id;
+      state.editingInvoiceNumber = inv.id;
+
+      app.router.navigate('create-invoice');
+    },
+
+    handleDeleteInvoice: async (invoiceNumber: string) => {
+      const inv = state.invoices.find((i: any) => i.id === invoiceNumber);
+      if (!inv) return;
+
+      if (!confirm(`Are you absolutely sure you want to delete Invoice ${invoiceNumber}? This action is irreversible and will restore all items back to stock.`)) {
+        return;
+      }
+
+      try {
+        // 1. Add back the stock for all invoice items
+        if (inv.items) {
+          for (const item of inv.items) {
+            const qty = item.qty || item.quantity || 0;
+            if (item.product_id && qty > 0) {
+              const { data: prod } = await supabase.from('products').select('stock_level').eq('id', item.product_id).single();
+              if (prod) {
+                const restoredStock = prod.stock_level + qty;
+                await supabase.from('products').update({ stock_level: restoredStock }).eq('id', item.product_id);
+              }
+            }
+          }
+        }
+
+        // 2. Delete the invoice from database (invoice_items deletes cascade)
+        const { error } = await supabase.from('invoices').delete().eq('id', inv.db_id);
+        if (error) throw error;
+
+        alert(`Invoice ${invoiceNumber} deleted successfully and stock has been restored!`);
+
+        // Refresh local data
+        app.handlers.handleInitializeData();
+
+        // Redirect back to invoices list if we are currently viewing the deleted invoice
+        if (state.currentView === 'view-invoice') {
+          app.router.navigate('invoices');
+        }
+      } catch (err: any) {
+        alert(`Failed to delete invoice: ${err.message}`);
+      }
     },
 
     handleFetchInvoiceResources: async () => {
@@ -1256,13 +1344,27 @@ const app = {
       for (const item of state.currentInvoice.items) {
          if (!item.product_id) continue;
          const prod = state.products.find((p: any) => p.id === item.product_id);
-         if (prod && item.qty > prod.stock_level) {
-            outOfStockItems.push(`${prod.name} (Requested: ${item.qty}, Available: ${prod.stock_level})`);
+         
+         // If editing, we adjust the stock check.
+         // We should allow the quantity that was already allocated to this invoice!
+         let allocatedQty = 0;
+         if (state.editingInvoiceDbId) {
+           const origInvoice = state.invoices.find((i: any) => i.db_id === state.editingInvoiceDbId);
+           if (origInvoice) {
+             const origItem = origInvoice.items.find((i: any) => i.product_id === item.product_id);
+             if (origItem) {
+               allocatedQty = origItem.qty || origItem.quantity || 0;
+             }
+           }
+         }
+
+         if (prod && item.qty > (prod.stock_level + allocatedQty)) {
+            outOfStockItems.push(`${prod.name} (Requested: ${item.qty}, Available: ${prod.stock_level + allocatedQty})`);
          }
       }
 
       if (outOfStockItems.length > 0) {
-         const msg = "The following items exceed available stock:\\n" + outOfStockItems.join('\\n') + "\\n\\nCreate invoice anyway?";
+         const msg = "The following items exceed available stock:\n" + outOfStockItems.join('\n') + "\n\nCreate invoice anyway?";
          if (!confirm(msg)) {
             if (submitBtn) (submitBtn as HTMLButtonElement).disabled = false;
             return;
@@ -1288,47 +1390,115 @@ const app = {
         const taxAmount = (subtotal - state.currentInvoice.discount) * (state.currentInvoice.taxRate / 100);
         const total = subtotal - state.currentInvoice.discount + taxAmount;
 
-        const { data: invoice, error: invErr } = await supabase
-          .from('invoices')
-          .insert([{
-            invoice_number: `INV-${Date.now().toString().slice(-6)}`,
-            customer_id: customerId,
-            subtotal,
-            tax_rate: state.currentInvoice.taxRate,
-            tax_amount: taxAmount,
-            discount_amount: state.currentInvoice.discount,
-            total_amount: total,
-            status: 'unpaid'
-          }])
-          .select()
-          .single();
+        if (state.editingInvoiceDbId) {
+          // UPDATE MODE
+          
+          // 1. Restore stock of original items first
+          const origInvoice = state.invoices.find((i: any) => i.db_id === state.editingInvoiceDbId);
+          if (origInvoice && origInvoice.items) {
+            for (const orig of origInvoice.items) {
+              const origQty = orig.qty || orig.quantity || 0;
+              if (orig.product_id && origQty > 0) {
+                const { data: prod } = await supabase.from('products').select('stock_level').eq('id', orig.product_id).single();
+                if (prod) {
+                  const restoredStock = prod.stock_level + origQty;
+                  await supabase.from('products').update({ stock_level: restoredStock }).eq('id', orig.product_id);
+                }
+              }
+            }
+          }
 
-        if (invErr) throw invErr;
+          // 2. Update invoice header
+          const { error: invErr } = await supabase
+            .from('invoices')
+            .update({
+              customer_id: customerId,
+              subtotal,
+              tax_rate: state.currentInvoice.taxRate,
+              tax_amount: taxAmount,
+              discount_amount: state.currentInvoice.discount,
+              total_amount: total
+            })
+            .eq('id', state.editingInvoiceDbId);
 
-        const itemsToInsert = state.currentInvoice.items.map((item: any) => ({
-          invoice_id: invoice.id,
-          product_id: item.product_id,
-          description: item.description,
-          quantity: item.qty,
-          unit_price: item.price,
-          total_price: item.qty * item.price
-        }));
+          if (invErr) throw invErr;
 
-        const { error: itemsErr } = await supabase.from('invoice_items').insert(itemsToInsert);
-        if (itemsErr) throw itemsErr;
+          // 3. Delete old invoice items
+          const { error: deleteErr } = await supabase
+             .from('invoice_items')
+             .delete()
+             .eq('invoice_id', state.editingInvoiceDbId);
+          if (deleteErr) throw deleteErr;
 
-        // Update stock levels
-        for (const item of state.currentInvoice.items) {
-           if (!item.product_id) continue;
-           const prod = state.products.find((p: any) => p.id === item.product_id);
-           if (prod) {
-              const newStock = Math.max(0, prod.stock_level - item.qty);
-              await supabase.from('products').update({ stock_level: newStock }).eq('id', prod.id);
-              prod.stock_level = newStock;
-           }
+          // 4. Insert new invoice items
+          const itemsToInsert = state.currentInvoice.items.map((item: any) => ({
+            invoice_id: state.editingInvoiceDbId,
+            product_id: item.product_id,
+            description: item.description,
+            quantity: item.qty,
+            unit_price: item.price,
+            total_price: item.qty * item.price
+          }));
+
+          const { error: itemsErr } = await supabase.from('invoice_items').insert(itemsToInsert);
+          if (itemsErr) throw itemsErr;
+
+          // 5. Subtract stock of new items
+          for (const item of state.currentInvoice.items) {
+             if (!item.product_id) continue;
+             const { data: prod } = await supabase.from('products').select('stock_level').eq('id', item.product_id).single();
+             if (prod) {
+                const newStock = Math.max(0, prod.stock_level - item.qty);
+                await supabase.from('products').update({ stock_level: newStock }).eq('id', item.product_id);
+             }
+          }
+
+          alert('Invoice updated successfully! Persisted to database.');
+
+        } else {
+          // CREATE MODE
+          const { data: invoice, error: invErr } = await supabase
+            .from('invoices')
+            .insert([{
+              invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+              customer_id: customerId,
+              subtotal,
+              tax_rate: state.currentInvoice.taxRate,
+              tax_amount: taxAmount,
+              discount_amount: state.currentInvoice.discount,
+              total_amount: total,
+              status: 'unpaid'
+            }])
+            .select()
+            .single();
+
+          if (invErr) throw invErr;
+
+          const itemsToInsert = state.currentInvoice.items.map((item: any) => ({
+            invoice_id: invoice.id,
+            product_id: item.product_id,
+            description: item.description,
+            quantity: item.qty,
+            unit_price: item.price,
+            total_price: item.qty * item.price
+          }));
+
+          const { error: itemsErr } = await supabase.from('invoice_items').insert(itemsToInsert);
+          if (itemsErr) throw itemsErr;
+
+          // Update stock levels
+          for (const item of state.currentInvoice.items) {
+             if (!item.product_id) continue;
+             const prod = state.products.find((p: any) => p.id === item.product_id);
+             if (prod) {
+                const newStock = Math.max(0, prod.stock_level - item.qty);
+                await supabase.from('products').update({ stock_level: newStock }).eq('id', prod.id);
+                prod.stock_level = newStock;
+             }
+          }
+
+          alert('Invoice created successfully! Persisted to database.');
         }
-
-        alert('Invoice created successfully! Persisted to database.');
         
         // Refresh local data to show new invoice on dashboard
         app.handlers.handleInitializeData();
@@ -1339,6 +1509,8 @@ const app = {
           discount: 0,
           taxRate: 0,
         };
+        state.editingInvoiceDbId = null;
+        state.editingInvoiceNumber = null;
 
         app.router.navigate('invoices');
       } catch (err: any) {
