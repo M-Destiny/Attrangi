@@ -5,6 +5,13 @@ A modern, premium Executive Enterprise Portal and CRM built for Attrangii to str
 ## ✨ Features
 
 - **Dynamic Dashboard**: Real-time insights including Month-to-Date (MTD) sales, a dynamic monthly revenue chart, top-selling products, and low stock alerts.
+- **Time-Aware Greeting Engine**: Displays dynamic time-of-day greetings ("Morning", "Afternoon", or "Evening") based on local system time.
+- **Comprehensive Reports & Performance Analytics View**: Dedicated interactive dashboard displaying key sales insights:
+  - **Category Split**: Visualizes total inventory stock value distribution across categories (**Jewelry**, **Accessories**, **Apparel**).
+  - **Member Collections**: Displays total revenue collected per team member (**MEHUL**, **SIMARPREET**, **DALBIR**).
+  - **Outstanding Balance Breakdown**: Multi-segment visual comparison showing Paid vs. Pending outstanding revenues.
+- **Advanced Dynamic Multi-Filter Controls**: Filter dashboard statistics and reports instantly by date range presets ("This Month", "Last 30 Days", "Last 6 Months", "All Time"), Custom Date Ranges (with start and end date calendars), and team members.
+- **Fixed Stretched Layouts & Phone Compatibility**: Responsive CSS layout adjustments utilizing custom viewport utility classes (`md:w-auto`, `md:w-44`, `md:w-40`) ensuring filter widgets size compactly on desktops while scaling beautifully on mobile screens.
 - **Interactive Revenue Momentum Chart**: Dynamic, actual-data-driven bar chart rendering based on real monthly billing statistics.
 - **Inventory Management**: Add, view, and track product stock levels, SKUs, and pricing.
 - **Comprehensive Invoice Lifecycle (Create, Edit, Delete)**:

@@ -82,7 +82,10 @@ const state: any = {
     salesMtd: 0,
     lowStock: 0,
     topSelling: [],
-    chartData: []
+    chartData: [],
+    categorySplit: [],
+    paidTo: [],
+    paymentBreakdown: { paid: 0, pending: 0, paidPct: 0, pendingPct: 0 }
   },
   products: [],
   invoices: [],
@@ -106,15 +109,158 @@ const state: any = {
   invoiceProductSearch: '',
   editingInvoiceDbId: null,
   editingInvoiceNumber: null,
+  analyticsFilters: {
+    member: 'All',
+    dateRange: 'All',
+    startDate: '',
+    endDate: ''
+  },
+  dashboardFilters: {
+    dateRange: 'Month',
+    startDate: '',
+    endDate: ''
+  },
 };
 
 // --- View Definitions ---
 const views: any = {
-  dashboard: () => `
-    <div class="view-header flex justify-between items-start md:items-end">
+  dashboard: () => {
+     const dateRangeFilter = state.dashboardFilters?.dateRange || 'Month';
+     
+     // Calculate dynamic greeting based on local time
+     const hour = new Date().getHours();
+     let greeting = 'Morning';
+     if (hour >= 12 && hour < 17) {
+        greeting = 'Afternoon';
+     } else if (hour >= 17 || hour < 5) {
+        greeting = 'Evening';
+     }
+
+     // 1. Filter Invoices based on dashboard date range
+     let filteredInvoices = [...state.invoices];
+     const now = new Date();
+     
+     if (dateRangeFilter === 'Month') {
+        filteredInvoices = filteredInvoices.filter((inv: any) => {
+           if (!inv.raw_date) return false;
+           const d = new Date(inv.raw_date);
+           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+     } else if (dateRangeFilter === '30Days') {
+        filteredInvoices = filteredInvoices.filter((inv: any) => {
+           if (!inv.raw_date) return false;
+           const d = new Date(inv.raw_date);
+           return (now.getTime() - d.getTime()) <= 30 * 24 * 60 * 60 * 1000;
+        });
+     } else if (dateRangeFilter === '6Months') {
+        filteredInvoices = filteredInvoices.filter((inv: any) => {
+           if (!inv.raw_date) return false;
+           const d = new Date(inv.raw_date);
+           return (now.getTime() - d.getTime()) <= 6 * 30 * 24 * 60 * 60 * 1000;
+        });
+     } else if (dateRangeFilter === 'Custom') {
+        const start = state.dashboardFilters?.startDate ? new Date(state.dashboardFilters.startDate) : null;
+        const end = state.dashboardFilters?.endDate ? new Date(state.dashboardFilters.endDate) : null;
+        filteredInvoices = filteredInvoices.filter((inv: any) => {
+           if (!inv.raw_date) return false;
+           const d = new Date(inv.raw_date);
+           const dTime = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+           if (start && end) {
+              const startTime = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+              const endTime = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+              return dTime >= startTime && dTime <= endTime;
+           } else if (start) {
+              const startTime = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+              return dTime >= startTime;
+           } else if (end) {
+              const endTime = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+              return dTime <= endTime;
+           }
+           return true;
+        });
+     }
+     
+     // 2. Calculate Sales performance for selected period
+     const periodSales = filteredInvoices.reduce((acc: any, inv: any) => acc + Number(inv.amount || 0), 0);
+     
+     // 3. Recalculate Top Selling based on filtered invoices
+     const itemCounts: any = {};
+     filteredInvoices.forEach((inv: any) => {
+        (inv.items || []).forEach((item: any) => {
+           itemCounts[item.product_id] = (itemCounts[item.product_id] || 0) + item.quantity;
+        });
+     });
+     let topSelling = Object.entries(itemCounts)
+        .sort((a: any, b: any) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([pid, qty]) => {
+           const p = state.products.find((prod: any) => prod.id === pid);
+           return p ? { name: p.name, qty, price: p.selling_price, image: p.image_url } : null;
+        })
+        .filter(Boolean);
+        
+     // Fallback to general top selling
+     if (topSelling.length === 0) {
+        topSelling = state.stats.topSelling || [];
+     }
+     
+     // 4. Recalculate Monthly Sales Overview based on filtered invoices
+     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+     const chartData = [];
+     let maxMonthSales = 0;
+     for (let i = 5; i >= 0; i--) {
+         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+         const monthSales = filteredInvoices.reduce((acc: any, inv: any) => {
+            if (!inv.raw_date) return acc;
+            const idate = new Date(inv.raw_date);
+            if (idate.getMonth() === d.getMonth() && idate.getFullYear() === d.getFullYear()) return acc + Number(inv.amount || 0);
+            return acc;
+         }, 0);
+         if (monthSales > maxMonthSales) maxMonthSales = monthSales;
+         chartData.push({ label: months[d.getMonth()], sales: monthSales, isCurrent: i === 0 });
+     }
+     const dynamicChartData = chartData.map((d: any) => ({ ...d, height: maxMonthSales > 0 ? (d.sales / maxMonthSales * 100) : 0 }));
+
+     // Date label for stat card
+     const dateLabels: any = {
+        All: 'All Time Revenue',
+        Month: 'Current MTD Sales',
+        '30Days': 'Last 30 Days Sales',
+        '6Months': 'Last 6 Months Sales',
+        Custom: 'Custom Range Sales'
+     };
+     const salesStatLabel = dateLabels[dateRangeFilter];
+
+     return `
+    <div class="view-header flex justify-between items-start md:items-end flex-wrap gap-4">
       <div>
-        <h2 class="font-black text-4xl md:text-5xl">Morning, ${state.user?.email?.split('@')[0] || 'Admin'}.</h2>
+        <h2 class="font-black text-4xl md:text-5xl">${greeting}, ${state.user?.email?.split('@')[0] || 'Admin'}.</h2>
         <p class="text-on-surface-variant mt-2">Here is the pulse of your inventory and sales today.</p>
+      </div>
+      
+      <!-- Premium Filter Controls -->
+      <div class="flex items-center flex-wrap bg-surface-container border border-outline rounded-3xl p-4 gap-4 w-full md:w-auto" style="gap: 1rem; justify-content: flex-start;">
+         <div class="flex flex-col gap-1 w-full md:w-44" style="min-width: 130px;">
+            <label class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Date Filter</label>
+            <select class="bg-surface-container-low border-none font-bold text-xs" style="padding: 0.5rem 1rem; border-radius: 0.75rem; width: 100%;" onchange="app.handlers.handleSetDashboardFilter('dateRange', this.value)">
+               <option value="Month" ${dateRangeFilter === 'Month' ? 'selected' : ''}>This Month</option>
+               <option value="30Days" ${dateRangeFilter === '30Days' ? 'selected' : ''}>Last 30 Days</option>
+               <option value="6Months" ${dateRangeFilter === '6Months' ? 'selected' : ''}>Last 6 Months</option>
+               <option value="All" ${dateRangeFilter === 'All' ? 'selected' : ''}>All Time</option>
+               <option value="Custom" ${dateRangeFilter === 'Custom' ? 'selected' : ''}>Custom Range</option>
+            </select>
+         </div>
+         
+         ${dateRangeFilter === 'Custom' ? `
+            <div class="flex flex-col gap-1 w-full md:w-40" style="min-width: 130px;">
+               <label class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Start Date</label>
+               <input type="date" value="${state.dashboardFilters?.startDate || ''}" class="bg-surface-container-low border-none font-bold text-xs text-on-surface" style="padding: 0.4rem 0.8rem; border-radius: 0.75rem; border: 1px solid var(--outline); color: var(--on-surface); background: var(--surface-container-low); width: 100%;" onchange="app.handlers.handleSetDashboardFilter('startDate', this.value)">
+            </div>
+            <div class="flex flex-col gap-1 w-full md:w-40" style="min-width: 130px;">
+               <label class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">End Date</label>
+               <input type="date" value="${state.dashboardFilters?.endDate || ''}" class="bg-surface-container-low border-none font-bold text-xs text-on-surface" style="padding: 0.4rem 0.8rem; border-radius: 0.75rem; border: 1px solid var(--outline); color: var(--on-surface); background: var(--surface-container-low); width: 100%;" onchange="app.handlers.handleSetDashboardFilter('endDate', this.value)">
+            </div>
+         ` : ''}
       </div>
     </div>
 
@@ -132,11 +278,11 @@ const views: any = {
       <div class="stat-card">
         <div class="flex justify-between items-center mb-4">
           <div class="stat-icon" style="background: var(--primary-container); color: var(--primary)">${ICONS.analytics}</div>
-          <span class="text-xs font-bold" style="color: var(--primary)">Current MTD</span>
+          <span class="text-xs font-bold" style="color: var(--primary)">Dynamic Range</span>
         </div>
         <div>
-          <p class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Sales Performance</p>
-          <p class="headline text-2xl font-black">₹${state.stats.salesMtd.toLocaleString('en-IN')}</p>
+          <p class="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">${salesStatLabel}</p>
+          <p class="headline text-2xl font-black">₹${periodSales.toLocaleString('en-IN')}</p>
         </div>
       </div>
       <div class="stat-card" style="background: var(--tertiary); color: white">
@@ -153,66 +299,67 @@ const views: any = {
 
     <!-- Analytics Chart -->
     <div class="card mt-8">
-       <div class="flex justify-between items-center mb-8">
+       <div class="flex justify-between items-center mb-8" style="margin-bottom: 1.5rem;">
           <h3 class="font-bold text-xl">Monthly Sales Overview</h3>
           <button class="btn btn-outline" onclick="app.router.navigate('analytics')">View Full Report</button>
        </div>
        <div class="bar-chart">
-          ${(state.stats.chartData || []).map((d: any) => `
+          ${(dynamicChartData || []).map((d: any) => `
              <div class="bar ${d.isCurrent ? 'active' : ''}" style="height: ${Math.max(5, d.height)}%" data-label="${d.label}"></div>
           `).join('')}
        </div>
     </div>
 
-    <div class="mt-8 flex gap-8 flex-col md:flex-row">
+    <div class="mt-8 flex gap-8 flex-col md:flex-row" style="gap: 2rem;">
        <div class="card overflow-hidden" style="flex: 2">
-          <div class="flex justify-between items-center mb-6">
+          <div class="flex justify-between items-center mb-6" style="margin-bottom: 1.5rem;">
             <h3 class="font-bold text-xl">Recent Orders</h3>
             <button class="btn btn-outline" onclick="app.router.navigate('invoices')">View All</button>
           </div>
           <div class="overflow-x-auto">
             <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>Order ID</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${state.invoices.length === 0 ? '<tr><td colspan="4" class="text-center opacity-30 py-8">No recent activity</td></tr>' : 
-                  state.invoices.slice(0, 5).map((inv: any) => `
-                    <tr>
-                      <td class="font-bold">${inv.customer}</td>
-                      <td class="text-on-surface-variant font-mono text-xs">${inv.id}</td>
-                      <td class="font-bold">₹${inv.amount.toLocaleString('en-IN')}</td>
-                      <td><span class="text-xs px-2 py-1 rounded-full" style="background: ${inv.status === 'Paid' ? 'var(--secondary-container)' : 'var(--tertiary-container)'}">${inv.status}</span></td>
-                    </tr>
-                  `).join('')}
-              </tbody>
+               <thead>
+                 <tr>
+                   <th>Customer</th>
+                   <th>Order ID</th>
+                   <th>Amount</th>
+                   <th>Status</th>
+                 </tr>
+               </thead>
+               <tbody>
+                 ${filteredInvoices.length === 0 ? '<tr><td colspan="4" class="text-center opacity-30 py-8">No matching activity</td></tr>' : 
+                   filteredInvoices.slice(0, 5).map((inv: any) => `
+                     <tr>
+                       <td class="font-bold">${inv.customer}</td>
+                       <td class="text-on-surface-variant font-mono text-xs">${inv.id}</td>
+                       <td class="font-bold">₹${inv.amount.toLocaleString('en-IN')}</td>
+                       <td><span class="text-xs px-2 py-1 rounded-full" style="background: ${inv.status === 'Paid' ? 'var(--secondary-container)' : 'var(--tertiary-container)'}">${inv.status}</span></td>
+                     </tr>
+                   `).join('')}
+               </tbody>
             </table>
           </div>
        </div>
        <div class="card" style="flex: 1">
-          <h3 class="font-bold text-xl mb-6">Top Selling</h3>
-          <ul class="flex flex-col gap-4">
-             ${(state.stats.topSelling || []).map((ts: any) => `
-               <li class="flex items-center gap-4">
-                  <div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-primary overflow-hidden">
-                      ${ts.image ? `<img src="${ts.image}" class="w-full h-full object-cover">` : ICONS.inventory}
+          <h3 class="font-bold text-xl mb-6" style="margin-bottom: 1.5rem;">Top Selling</h3>
+          <ul class="flex flex-col gap-4" style="display: flex; flex-direction: column; gap: 1rem;">
+             ${(topSelling || []).map((ts: any) => `
+               <li class="flex items-center gap-4" style="display: flex; align-items: center; gap: 1rem;">
+                  <div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-primary overflow-hidden" style="width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-center; overflow: hidden; flex-shrink: 0;">
+                      ${ts.image ? `<img src="${ts.image}" class="w-full h-full object-cover" style="width: 100%; height: 100%; object-fit: cover;">` : ICONS.inventory}
                   </div>
                   <div>
                      <p class="font-bold text-sm">${ts.name}</p>
                      <p class="text-xs text-on-surface-variant">${ts.qty > 0 ? `${ts.qty} sold` : 'New arrival'}</p>
                   </div>
-                  <div class="ml-auto font-bold">₹${ts.price.toLocaleString('en-IN')}</div>
+                  <div class="ml-auto font-bold" style="margin-left: auto;">₹${ts.price.toLocaleString('en-IN')}</div>
                </li>
              `).join('')}
           </ul>
        </div>
     </div>
-  `,
+  `;
+  },
   products: () => `
 <div class="view-header flex justify-between items-start md:items-end">
   <div>
@@ -277,8 +424,12 @@ const views: any = {
                     <input type="text" placeholder="BAG-LTH-001" class="w-full" value="${state.newProduct.sku}" oninput="state.newProduct.sku = this.value">
                 </div>
                 <div class="flex flex-col gap-1 flex-1">
-                    <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Serial Number</label>
-                    <input type="text" placeholder="Optional" class="w-full">
+                    <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Category</label>
+                    <select class="w-full" onchange="state.newProduct.category = this.value">
+                      <option value="Jewelry" ${state.newProduct.category === 'Jewelry' ? 'selected' : ''}>Jewelry</option>
+                      <option value="Accessories" ${state.newProduct.category === 'Accessories' ? 'selected' : ''}>Accessories</option>
+                      <option value="Apparel" ${state.newProduct.category === 'Apparel' ? 'selected' : ''}>Apparel</option>
+                    </select>
                 </div>
              </div>
           </div>
@@ -526,55 +677,291 @@ const views: any = {
       </div>
     </div>
   `,
-  analytics: () => `
-    <div class="view-header">
-      <h2 class="font-black text-4xl md:text-5xl">Performance Depth.</h2>
-      <p class="text-on-surface-variant mt-2">Historical trends and predictive sales data.</p>
+  analytics: () => {
+     const memberFilter = state.analyticsFilters?.member || 'All';
+     const dateRangeFilter = state.analyticsFilters?.dateRange || 'All';
+     
+     // 1. Filter Invoices
+     let filteredInvoices = [...state.invoices];
+     
+     // Filter by date range first
+     const now = new Date();
+     if (dateRangeFilter === 'Month') {
+        filteredInvoices = filteredInvoices.filter((inv: any) => {
+           if (!inv.raw_date) return false;
+           const d = new Date(inv.raw_date);
+           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+     } else if (dateRangeFilter === '30Days') {
+        filteredInvoices = filteredInvoices.filter((inv: any) => {
+           if (!inv.raw_date) return false;
+           const d = new Date(inv.raw_date);
+           return (now.getTime() - d.getTime()) <= 30 * 24 * 60 * 60 * 1000;
+        });
+     } else if (dateRangeFilter === '6Months') {
+        filteredInvoices = filteredInvoices.filter((inv: any) => {
+           if (!inv.raw_date) return false;
+           const d = new Date(inv.raw_date);
+           return (now.getTime() - d.getTime()) <= 6 * 30 * 24 * 60 * 60 * 1000;
+        });
+     } else if (dateRangeFilter === 'Custom') {
+        const start = state.analyticsFilters?.startDate ? new Date(state.analyticsFilters.startDate) : null;
+        const end = state.analyticsFilters?.endDate ? new Date(state.analyticsFilters.endDate) : null;
+        filteredInvoices = filteredInvoices.filter((inv: any) => {
+           if (!inv.raw_date) return false;
+           const d = new Date(inv.raw_date);
+           const dTime = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+           if (start && end) {
+              const startTime = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+              const endTime = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+              return dTime >= startTime && dTime <= endTime;
+           } else if (start) {
+              const startTime = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+              return dTime >= startTime;
+           } else if (end) {
+              const endTime = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+              return dTime <= endTime;
+           }
+           return true;
+        });
+     }
+     
+     // Filter by member (paid_to) - for charts other than Member Payments
+     let memberFilteredInvoices = [...filteredInvoices];
+     if (memberFilter !== 'All') {
+        memberFilteredInvoices = memberFilteredInvoices.filter((inv: any) => {
+           if (memberFilter === 'Others') {
+              return inv.status === 'Paid' && (!inv.paid_to || !['MEHUL', 'SIMARPREET', 'DALBIR'].includes(inv.paid_to.toUpperCase()));
+           }
+           return inv.status === 'Paid' && inv.paid_to && inv.paid_to.toUpperCase() === memberFilter.toUpperCase();
+        });
+     }
+
+     // 2. Recalculate Revenue Momentum based on memberFilteredInvoices sales
+     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+     const chartData = [];
+     let maxMonthSales = 0;
+     for (let i = 5; i >= 0; i--) {
+         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+         const monthSales = memberFilteredInvoices.reduce((acc: any, inv: any) => {
+            if (!inv.raw_date) return acc;
+            const idate = new Date(inv.raw_date);
+            if (idate.getMonth() === d.getMonth() && idate.getFullYear() === d.getFullYear()) return acc + Number(inv.amount || 0);
+            return acc;
+         }, 0);
+         if (monthSales > maxMonthSales) maxMonthSales = monthSales;
+         chartData.push({ label: months[d.getMonth()], sales: monthSales, isCurrent: i === 0 });
+     }
+     const dynamicChartData = chartData.map((d: any) => ({ ...d, height: maxMonthSales > 0 ? (d.sales / maxMonthSales * 100) : 0 }));
+
+     // 3. Recalculate Category Split based on memberFilteredInvoices sales
+     const categoryValue: any = {};
+     let totalVal = 0;
+     memberFilteredInvoices.forEach((inv: any) => {
+        (inv.items || []).forEach((item: any) => {
+           const prod = state.products.find((p: any) => p.id === item.product_id);
+           const cat = prod?.category || 'Jewelry';
+           const val = Number(item.total_price || item.unit_price * item.quantity || 0);
+           categoryValue[cat] = (categoryValue[cat] || 0) + val;
+           totalVal += val;
+        });
+     });
+     
+     let dynamicCategorySplit = Object.entries(categoryValue).map(([name, val]) => {
+        const pct = totalVal > 0 ? Math.round((val as number) / totalVal * 100) : 0;
+        return { name, pct, value: val };
+     }).sort((a: any, b: any) => (b.value as number) - (a.value as number));
+
+     if (totalVal === 0) {
+        dynamicCategorySplit = state.stats.categorySplit || [];
+     }
+
+     // 4. Recalculate Member Payments collections based on date-filtered invoices
+     const paidToData: any = {
+        'MEHUL': 0,
+        'SIMARPREET': 0,
+        'DALBIR': 0,
+        'Others': 0
+     };
+     let totalPaid = 0;
+     filteredInvoices.forEach((inv: any) => {
+        if (inv.status === 'Paid') {
+           const amt = Number(inv.amount || 0);
+           const receiver = inv.paid_to ? inv.paid_to.toUpperCase() : 'Others';
+           if (paidToData[receiver] !== undefined) {
+              paidToData[receiver] += amt;
+           } else {
+              paidToData[receiver] = amt;
+           }
+           totalPaid += amt;
+        }
+     });
+     const dynamicPaidTo = Object.entries(paidToData)
+        .map(([name, amount]) => {
+           const pct = totalPaid > 0 ? Math.round((amount as number) / totalPaid * 100) : 0;
+           return { name, amount, pct };
+        })
+        .sort((a: any, b: any) => (b.amount as number) - (a.amount as number))
+        .filter(x => (x.amount as number) > 0 || ['MEHUL', 'SIMARPREET', 'DALBIR'].includes(x.name));
+
+     // 5. Recalculate Paid vs Pending balance split based on memberFilteredInvoices
+     let totalPaidAmount = 0;
+     let totalPendingAmount = 0;
+     memberFilteredInvoices.forEach((inv: any) => {
+        const amt = Number(inv.amount || 0);
+        if (inv.status === 'Paid') {
+           totalPaidAmount += amt;
+        } else {
+           totalPendingAmount += amt;
+        }
+     });
+     const totalOverall = totalPaidAmount + totalPendingAmount;
+     const dynamicPaymentBreakdown = {
+        paid: totalPaidAmount,
+        pending: totalPendingAmount,
+        paidPct: totalOverall > 0 ? Math.round(totalPaidAmount / totalOverall * 100) : 0,
+        pendingPct: totalOverall > 0 ? Math.round(totalPendingAmount / totalOverall * 100) : 0
+     };
+
+     return `
+    <div class="view-header flex justify-between items-start md:items-end flex-wrap gap-4" style="margin-bottom: 2rem;">
+      <div>
+        <h2 class="font-black text-4xl md:text-5xl">Performance Depth.</h2>
+        <p class="text-on-surface-variant mt-2">Historical trends and predictive sales data.</p>
+      </div>
+      
+      <!-- Premium Filter Controls -->
+      <div class="flex items-center flex-wrap bg-surface-container border border-outline rounded-3xl p-4 gap-4 w-full md:w-auto" style="gap: 1rem; justify-content: flex-start;">
+         <div class="flex flex-col gap-1 w-full md:w-44" style="min-width: 130px;">
+            <label class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Member Filter</label>
+            <select class="bg-surface-container-low border-none font-bold text-xs" style="padding: 0.5rem 1rem; border-radius: 0.75rem; width: 100%;" onchange="app.handlers.handleSetAnalyticsFilter('member', this.value)">
+               <option value="All" ${memberFilter === 'All' ? 'selected' : ''}>All Members</option>
+               <option value="MEHUL" ${memberFilter === 'MEHUL' ? 'selected' : ''}>MEHUL</option>
+               <option value="SIMARPREET" ${memberFilter === 'SIMARPREET' ? 'selected' : ''}>SIMARPREET</option>
+               <option value="DALBIR" ${memberFilter === 'DALBIR' ? 'selected' : ''}>DALBIR</option>
+               <option value="Others" ${memberFilter === 'Others' ? 'selected' : ''}>Others</option>
+            </select>
+         </div>
+         
+         <div class="flex flex-col gap-1 w-full md:w-44" style="min-width: 130px;">
+            <label class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Date Range</label>
+            <select class="bg-surface-container-low border-none font-bold text-xs" style="padding: 0.5rem 1rem; border-radius: 0.75rem; width: 100%;" onchange="app.handlers.handleSetAnalyticsFilter('dateRange', this.value)">
+               <option value="All" ${dateRangeFilter === 'All' ? 'selected' : ''}>All Time</option>
+               <option value="Month" ${dateRangeFilter === 'Month' ? 'selected' : ''}>This Month</option>
+               <option value="30Days" ${dateRangeFilter === '30Days' ? 'selected' : ''}>Last 30 Days</option>
+               <option value="6Months" ${dateRangeFilter === '6Months' ? 'selected' : ''}>Last 6 Months</option>
+               <option value="Custom" ${dateRangeFilter === 'Custom' ? 'selected' : ''}>Custom Range</option>
+            </select>
+         </div>
+         
+         ${dateRangeFilter === 'Custom' ? `
+            <div class="flex flex-col gap-1 w-full md:w-40" style="min-width: 130px;">
+               <label class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">Start Date</label>
+               <input type="date" value="${state.analyticsFilters?.startDate || ''}" class="bg-surface-container-low border-none font-bold text-xs text-on-surface" style="padding: 0.4rem 0.8rem; border-radius: 0.75rem; border: 1px solid var(--outline); color: var(--on-surface); background: var(--surface-container-low); width: 100%;" onchange="app.handlers.handleSetAnalyticsFilter('startDate', this.value)">
+            </div>
+            <div class="flex flex-col gap-1 w-full md:w-40" style="min-width: 130px;">
+               <label class="text-[9px] font-black uppercase tracking-widest text-on-surface-variant opacity-60">End Date</label>
+               <input type="date" value="${state.analyticsFilters?.endDate || ''}" class="bg-surface-container-low border-none font-bold text-xs text-on-surface" style="padding: 0.4rem 0.8rem; border-radius: 0.75rem; border: 1px solid var(--outline); color: var(--on-surface); background: var(--surface-container-low); width: 100%;" onchange="app.handlers.handleSetAnalyticsFilter('endDate', this.value)">
+            </div>
+         ` : ''}
+      </div>
     </div>
     
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 mt-8" style="gap: 2.5rem;">
+       <!-- Revenue Momentum -->
        <div class="card">
-          <h3 class="font-bold text-xl mb-8">Revenue Momentum</h3>
+          <h3 class="font-bold text-xl mb-6">Revenue Momentum</h3>
           <div class="bar-chart">
-             ${(state.stats.chartData || []).map((d: any) => `
+             ${(dynamicChartData || []).map((d: any) => `
                 <div class="bar ${d.isCurrent ? 'active' : ''}" style="height: ${Math.max(5, d.height)}%" data-label="${d.label}"></div>
              `).join('')}
           </div>
        </div>
+
+       <!-- Category Split -->
        <div class="card">
-          <h3 class="font-bold text-xl mb-8">Category Split</h3>
-          <div class="flex flex-col gap-6">
-             <div class="space-y-2">
-                <div class="flex justify-between text-xs font-bold uppercase opacity-60">
-                   <span>Jewelry</span>
-                   <span>65%</span>
+          <h3 class="font-bold text-xl mb-6">Category Split</h3>
+          <div class="flex flex-col" style="gap: 1.5rem;">
+             ${(dynamicCategorySplit || []).length === 0 ? `
+                <div class="flex flex-col items-center justify-center py-8 opacity-40">
+                   <p class="text-xs font-bold">No product inventory categorized yet</p>
                 </div>
-                <div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
-                   <div class="h-full bg-primary" style="width: 65%"></div>
+             ` : (dynamicCategorySplit || []).map((cat: any, index: number) => {
+                const colors = ['var(--primary)', 'var(--secondary)', 'var(--tertiary)', 'var(--error)'];
+                const color = colors[index % colors.length];
+                return `
+                   <div class="flex flex-col" style="gap: 0.5rem;">
+                      <div class="flex justify-between text-xs font-bold uppercase opacity-60">
+                         <span>${cat.name}</span>
+                         <span>${cat.pct}%</span>
+                      </div>
+                      <div style="width: 100%; height: 8px; background: var(--surface-container-highest); border-radius: 9999px; overflow: hidden;">
+                         <div style="height: 100%; border-radius: 9999px; background: ${color}; width: ${cat.pct}%"></div>
+                      </div>
+                   </div>
+                `;
+             }).join('')}
+          </div>
+       </div>
+
+       <!-- Member Payments -->
+       <div class="card">
+          <h3 class="font-bold text-xl mb-6">Member Payments (Collections)</h3>
+          <div class="flex flex-col" style="gap: 1.5rem;">
+             ${(dynamicPaidTo || []).length === 0 ? `
+                <div class="flex flex-col items-center justify-center py-8 opacity-40">
+                   <p class="text-xs font-bold">No payment collections tracked yet</p>
                 </div>
+             ` : (dynamicPaidTo || []).map((agent: any, index: number) => {
+                const colors = ['var(--secondary)', 'var(--primary)', 'var(--tertiary)', 'var(--error)'];
+                const color = colors[index % colors.length];
+                return `
+                   <div class="flex flex-col" style="gap: 0.5rem;">
+                      <div class="flex justify-between text-xs font-bold uppercase opacity-60">
+                         <span>${agent.name}</span>
+                         <span>₹${agent.amount.toLocaleString('en-IN')} (${agent.pct}%)</span>
+                      </div>
+                      <div style="width: 100%; height: 8px; background: var(--surface-container-highest); border-radius: 9999px; overflow: hidden;">
+                         <div style="height: 100%; border-radius: 9999px; background: ${color}; width: ${agent.pct}%"></div>
+                      </div>
+                   </div>
+                `;
+             }).join('')}
+          </div>
+       </div>
+
+       <!-- Paid vs Pending breakdown -->
+       <div class="card">
+          <h3 class="font-bold text-xl mb-6">Outstanding Balance Breakdown</h3>
+          <div class="flex flex-col" style="gap: 1.5rem;">
+             <div class="flex justify-between items-center flex-wrap gap-2 text-xs font-bold uppercase opacity-60">
+                <span>Payment Summary</span>
+                <span class="text-xs font-mono font-bold">Total Sales: ₹${((dynamicPaymentBreakdown?.paid || 0) + (dynamicPaymentBreakdown?.pending || 0)).toLocaleString('en-IN')}</span>
              </div>
-             <div class="space-y-2">
-                <div class="flex justify-between text-xs font-bold uppercase opacity-60">
-                   <span>Accessories</span>
-                   <span>25%</span>
-                </div>
-                <div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
-                   <div class="h-full bg-secondary" style="width: 25%"></div>
-                </div>
+             
+             <!-- Multi-segment progress bar representing split -->
+             <div style="width: 100%; height: 16px; background: var(--surface-container-highest); border-radius: 9999px; overflow: hidden; display: flex;">
+                <div class="transition-all" style="background: var(--secondary); width: ${dynamicPaymentBreakdown?.paidPct || 0}%; height: 100%;" title="Paid"></div>
+                <div class="transition-all" style="background: var(--error); width: ${dynamicPaymentBreakdown?.pendingPct || 0}%; height: 100%;" title="Pending"></div>
              </div>
-             <div class="space-y-2">
-                <div class="flex justify-between text-xs font-bold uppercase opacity-60">
-                   <span>Apparel</span>
-                   <span>10%</span>
+             
+             <div class="flex justify-between items-center flex-wrap text-xs" style="gap: 1rem;">
+                <div class="flex items-center gap-2 flex-wrap" style="display: flex; align-items: center; gap: 0.5rem;">
+                   <div style="background: var(--secondary); width: 12px; height: 12px; border-radius: 50%; display: inline-block;"></div>
+                   <span class="font-bold text-on-surface-variant">Paid:</span>
+                   <span class="font-black">₹${(dynamicPaymentBreakdown?.paid || 0).toLocaleString('en-IN')} (${dynamicPaymentBreakdown?.paidPct || 0}%)</span>
                 </div>
-                <div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
-                   <div class="h-full bg-tertiary" style="width: 10%"></div>
+                <div class="flex items-center gap-2 flex-wrap" style="display: flex; align-items: center; gap: 0.5rem;">
+                   <div style="background: var(--error); width: 12px; height: 12px; border-radius: 50%; display: inline-block;"></div>
+                   <span class="font-bold text-on-surface-variant">Pending:</span>
+                   <span class="font-black">₹${(dynamicPaymentBreakdown?.pending || 0).toLocaleString('en-IN')} (${dynamicPaymentBreakdown?.pendingPct || 0}%)</span>
                 </div>
              </div>
           </div>
        </div>
     </div>
-  `,
+  `;
+  },
   auth: () => `
     <div class="auth-container">
        <div class="auth-card">
@@ -897,6 +1284,11 @@ const app = {
                 </button>
               </li>
               <li>
+                <button onclick="app.router.navigate('analytics')" data-view="analytics" class="nav-link w-full text-left ${state.currentView === 'analytics' ? 'active' : ''}">
+                  ${ICONS.analytics} <span>Reports</span>
+                </button>
+              </li>
+              <li>
                 <button onclick="app.router.navigate('search')" data-view="search" class="nav-link w-full text-left ${state.currentView === 'search' ? 'active' : ''}">
                   ${ICONS.search} <span>Smart Search</span>
                 </button>
@@ -939,6 +1331,10 @@ const app = {
            <div class="${state.currentView === 'invoices' ? 'active' : ''}" data-view="invoices" onclick="app.router.navigate('invoices')">
               ${ICONS.invoices}
               <span class="text-[10px] font-bold">Billing</span>
+           </div>
+           <div class="${state.currentView === 'analytics' ? 'active' : ''}" data-view="analytics" onclick="app.router.navigate('analytics')">
+              ${ICONS.analytics}
+              <span class="text-[10px] font-bold">Reports</span>
            </div>
            <div class="${state.currentView === 'search' ? 'active' : ''}" data-view="search" onclick="app.router.navigate('search')">
               ${ICONS.search}
@@ -1074,6 +1470,7 @@ const app = {
          discount: i.discount_amount || 0,
          taxRate: i.tax_rate || 0,
          date: new Date(i.issue_date).toLocaleDateString(),
+         raw_date: i.issue_date,
          amount: i.total_amount,
          status: i.status.charAt(0).toUpperCase() + i.status.slice(1),
          paid_to: i.paid_to,
@@ -1139,6 +1536,84 @@ const app = {
           chartData.push({ label: months[d.getMonth()], sales: monthSales, isCurrent: i === 0 });
       }
       state.stats.chartData = chartData.map((d: any) => ({ ...d, height: maxMonthSales > 0 ? (d.sales / maxMonthSales * 100) : 0 }));
+      
+      // 1. Category Split calculation
+      const categoryValue: any = {};
+      let totalVal = 0;
+      (prods || []).forEach((p: any) => {
+         const cat = p.category || 'Jewelry';
+         const val = (p.selling_price || 0) * (p.stock_level || 0);
+         categoryValue[cat] = (categoryValue[cat] || 0) + val;
+         totalVal += val;
+      });
+      
+      let categorySplit = Object.entries(categoryValue).map(([name, val]) => {
+         const pct = totalVal > 0 ? Math.round((val as number) / totalVal * 100) : 0;
+         return { name, pct, value: val };
+      }).sort((a: any, b: any) => (b.value as number) - (a.value as number));
+
+      if (totalVal === 0) {
+         const categoryCount: any = {};
+         (prods || []).forEach((p: any) => {
+            const cat = p.category || 'Jewelry';
+            categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+         });
+         const totalCount = (prods || []).length;
+         categorySplit = Object.entries(categoryCount).map(([name, count]) => {
+            const pct = totalCount > 0 ? Math.round((count as number) / totalCount * 100) : 0;
+            return { name, pct, value: count };
+         }).sort((a: any, b: any) => (b.value as number) - (a.value as number));
+      }
+      state.stats.categorySplit = categorySplit;
+
+      // 2. Agent payments calculation (paid to who)
+      const paidToData: any = {
+         'MEHUL': 0,
+         'SIMARPREET': 0,
+         'DALBIR': 0
+      };
+      let totalPaid = 0;
+      state.invoices.forEach((inv: any) => {
+         if (inv.status === 'Paid') {
+            const amt = Number(inv.amount || 0);
+            const receiver = inv.paid_to ? inv.paid_to.toUpperCase() : null;
+            if (receiver && paidToData[receiver] !== undefined) {
+               paidToData[receiver] += amt;
+               totalPaid += amt;
+            } else if (receiver) {
+               paidToData[receiver] = amt;
+               totalPaid += amt;
+            } else {
+               paidToData['Others'] = (paidToData['Others'] || 0) + amt;
+               totalPaid += amt;
+            }
+         }
+      });
+      state.stats.paidTo = Object.entries(paidToData)
+         .map(([name, amount]) => {
+            const pct = totalPaid > 0 ? Math.round((amount as number) / totalPaid * 100) : 0;
+            return { name, amount, pct };
+         })
+         .sort((a: any, b: any) => (b.amount as number) - (a.amount as number));
+
+      // 3. Paid vs Pending breakdown
+      let totalPaidAmount = 0;
+      let totalPendingAmount = 0;
+      state.invoices.forEach((inv: any) => {
+         const amt = Number(inv.amount || 0);
+         if (inv.status === 'Paid') {
+            totalPaidAmount += amt;
+         } else {
+            totalPendingAmount += amt;
+         }
+      });
+      const totalOverall = totalPaidAmount + totalPendingAmount;
+      state.stats.paymentBreakdown = {
+         paid: totalPaidAmount,
+         pending: totalPendingAmount,
+         paidPct: totalOverall > 0 ? Math.round(totalPaidAmount / totalOverall * 100) : 0,
+         pendingPct: totalOverall > 0 ? Math.round(totalPendingAmount / totalOverall * 100) : 0
+      };
       
       app.render();
     },
@@ -1800,6 +2275,16 @@ const app = {
         alert(`Storage Failure: ${err.message}`);
         if (btn) btn.disabled = false;
       }
+    },
+
+    handleSetAnalyticsFilter: (field: string, value: string) => {
+      state.analyticsFilters[field] = value;
+      app.render();
+    },
+
+    handleSetDashboardFilter: (field: string, value: string) => {
+      state.dashboardFilters[field] = value;
+      app.render();
     }
   }
 };
