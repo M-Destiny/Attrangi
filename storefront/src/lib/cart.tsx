@@ -21,7 +21,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     add: (p, qty = 1) => { if (p.stock_level < 1) return; setLines(ls => {
       const ex = ls.find(l => l.product.id === p.id);
       return ex ? ls.map(l => l.product.id === p.id ? { product: p, qty: clampQty(p, l.qty + qty) } : l) : [...ls, { product: p, qty: clampQty(p, qty) }];
-    }); setOpen(true); },
+    }); },
     setQty: (id, qty) => setLines(ls => ls.map(l => l.product.id === id ? { ...l, qty: clampQty(l.product, qty) } : l)),
     remove: id => setLines(ls => ls.filter(l => l.product.id !== id)),
     clear: () => setLines([]),

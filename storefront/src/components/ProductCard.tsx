@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Minus, Plus } from 'lucide-react';
 import { useCart } from '../lib/cart';
 import { inr } from '../lib/format';
 import type { Product } from '../lib/types';
 
 export default function ProductCard({ product: p }: { product: Product }) {
-  const { add } = useCart();
+  const { add, lines, setQty, remove } = useCart();
   const out = p.stock_level < 1;
+  const inCart = lines.find(l => l.product.id === p.id)?.qty ?? 0;
   const initials = p.name.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   return (
     <article className="group relative flex flex-col">
@@ -29,12 +30,22 @@ export default function ProductCard({ product: p }: { product: Product }) {
           <p className="mt-1 font-semibold text-brand-dark">{inr(p.selling_price)}</p>
         </div>
       </Link>
-      <button
-        type="button" disabled={out} onClick={() => add(p)} aria-label={out ? `${p.name} is out of stock` : `Add ${p.name} to cart`}
-        className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full bg-brand text-white transition hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:bg-line disabled:text-muted"
-      >
-        <Plus size={20} aria-hidden />
-      </button>
+      {inCart > 0 ? (
+        <div role="group" aria-label={`${p.name} quantity in cart`} className="absolute bottom-0 right-0 flex h-9 items-center rounded-full bg-brand text-white shadow">
+          <button type="button" onClick={() => (inCart > 1 ? setQty(p.id, inCart - 1) : remove(p.id))} aria-label={inCart > 1 ? `Remove one ${p.name}` : `Remove ${p.name} from cart`}
+            className="flex h-9 w-8 items-center justify-center rounded-full hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"><Minus size={16} aria-hidden /></button>
+          <span className="min-w-5 text-center text-sm font-bold" aria-live="polite">{inCart}</span>
+          <button type="button" disabled={inCart >= p.stock_level} onClick={() => add(p)} aria-label={`Add one more ${p.name}`}
+            className="flex h-9 w-8 items-center justify-center rounded-full hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-40"><Plus size={16} aria-hidden /></button>
+        </div>
+      ) : (
+        <button
+          type="button" disabled={out} onClick={() => add(p)} aria-label={out ? `${p.name} is out of stock` : `Add ${p.name} to cart`}
+          className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full bg-brand text-white transition hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:bg-line disabled:text-muted"
+        >
+          <Plus size={20} aria-hidden />
+        </button>
+      )}
     </article>
   );
 }

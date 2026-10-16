@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ChevronRight, Minus, Plus } from 'lucide-react';
+import { Check, ChevronRight, Minus, Plus } from 'lucide-react';
 import { getProduct, getProducts } from '../lib/api';
 import { useCart } from '../lib/cart';
 import { inr } from '../lib/format';
@@ -11,11 +11,18 @@ import ProductCard from '../components/ProductCard';
 export default function ProductPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const { add } = useCart();
+  const { add, lines, setOpen } = useCart();
+  const [justAdded, setJustAdded] = useState(false);
   const [product, setProduct] = useState<Product | null | undefined>(undefined); // undefined = loading
   const [related, setRelated] = useState<Product[]>([]);
   const [error, setError] = useState('');
   const [qty, setQty] = useState(1);
+
+  useEffect(() => {
+    if (!justAdded) return;
+    const t = setTimeout(() => setJustAdded(false), 1800);
+    return () => clearTimeout(t);
+  }, [justAdded]);
 
   useEffect(() => {
     let live = true;
@@ -47,6 +54,7 @@ export default function ProductPage() {
 
   const stock = product.stock_level;
   const out = stock < 1;
+  const inCart = lines.find(l => l.product.id === product.id)?.qty ?? 0;
   const step = (d: number) => setQty(q => Math.max(1, Math.min(stock, q + d)));
   const btn = 'rounded-full px-6 py-3 font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50';
 
@@ -81,9 +89,16 @@ export default function ProductPage() {
           )}
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button disabled={out} onClick={() => add(product, qty)} className={`${btn} bg-brand text-white hover:bg-brand-dark`}>{out ? 'Sold out' : 'Add to cart'}</button>
+            <button disabled={out} onClick={() => { add(product, qty); setJustAdded(true); }} className={`${btn} bg-brand text-white hover:bg-brand-dark`}>
+              {out ? 'Sold out' : justAdded ? <span className="inline-flex items-center gap-2"><Check className="size-4" aria-hidden />Added</span> : 'Add to cart'}
+            </button>
             <button disabled={out} onClick={() => { add(product, qty); navigate('/checkout'); }} className={`${btn} border-2 border-ink text-ink hover:bg-ink hover:text-white`}>Buy now</button>
           </div>
+          {inCart > 0 && (
+            <p role="status" className="mt-3 text-sm text-muted">
+              {inCart} in your cart · <button type="button" onClick={() => setOpen(true)} className="font-semibold text-brand-dark underline underline-offset-2">View cart</button>
+            </p>
+          )}
 
           <dl className="mt-8 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-line pt-6 text-sm">
             <dt className="text-muted">SKU</dt><dd>{product.sku}</dd>
