@@ -4,6 +4,9 @@
  */
 import './index.css';
 import { supabase } from './lib/supabase';
+import { inject } from '@vercel/analytics';
+
+inject(); // Vercel Web Analytics (page views)
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 import logoUrl from './assets/logo.png';
