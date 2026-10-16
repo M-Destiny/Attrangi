@@ -8,7 +8,6 @@ from (values
   ('F1 Blocks', 'F1-BLOCKS', 'Building Blocks', 1600, 3, null, '{}'::text[]),
   ('Blokees', 'BLOKEES', 'Building Blocks', 350, 19, 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/blokees-01.jpg', array['https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/blokees-01.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/blokees-02.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/blokees-03.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/blokees-04.jpg']),
   ('F1 Lego Cars', 'F1-LEGO-CARS', 'Building Blocks', 1600, 2, null, '{}'::text[]),
-  ('Pokeballs', 'POKEBALLS', 'Toys & Novelty', 1400, 6, 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/pokeballs-01.jpg', array['https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/pokeballs-01.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/pokeballs-02.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/pokeballs-03.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/pokeballs-04.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/pokeballs-05.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/pokeballs-06.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/pokeballs-07.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/pokeballs-08.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/pokeballs-09.jpg']),
   ('Bubbles', 'BUBBLES', 'Toys & Novelty', 250, 6, 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/bubbles-01.jpg', array['https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/bubbles-01.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/bubbles-02.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/bubbles-03.jpg']),
   ('Ironman Mystery Box', 'IRONMAN-MYSTERY-BOX', 'Toys & Novelty', 450, 9, null, '{}'::text[]),
   ('Marvel Infinity', 'MARVEL-INFINITY', 'Action Figures & Statues', 450, 9, 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/marvel-infinity-01.jpg', array['https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/marvel-infinity-01.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/marvel-infinity-02.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/marvel-infinity-03.jpg', 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/marvel-infinity-04.jpg']),
@@ -74,3 +73,24 @@ on conflict (sku) do nothing;
 delete from public.products p where p.sku in ('BRICKS','NARUTO','DEMON-SLAYER')
   and not exists (select 1 from public.invoice_items ii where ii.product_id = p.id);
 update public.products set stock_level = 0 where sku in ('BRICKS','NARUTO','DEMON-SLAYER');
+
+-- Pokeballs: one product per design (6). Reuses the existing POKEBALLS row (keeps order history intact) as the first design.
+update public.products set name = 'Pokeball Squirtle', sku = 'POKEBALL-SQUIRTLE', selling_price = 1400, stock_level = 1,
+  image_url = 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/' || split_part('pokeballs-02,pokeballs-01', ',', 1) || '.jpg',
+  images = array(select 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/' || f || '.jpg' from unnest(string_to_array('pokeballs-02,pokeballs-01', ',')) with ordinality as t(f, n) order by n)
+where sku = 'POKEBALLS';
+
+insert into public.products (name, sku, category, selling_price, stock_level, low_stock_threshold, image_url, images)
+select v.name, v.sku, 'Toys & Novelty', v.price, v.pieces, 2,
+       b.base || split_part(v.files, ',', 1) || '.jpg',
+       array(select b.base || f || '.jpg' from unnest(string_to_array(v.files, ',')) with ordinality as t(f, n) order by n)
+from (values
+  ('Pokeball Squirtle', 'POKEBALL-SQUIRTLE', 1400, 1, 'pokeballs-02,pokeballs-01'),
+  ('Pokeball Meowth', 'POKEBALL-MEOWTH', 1400, 1, 'pokeballs-03'),
+  ('Pokeball Pikachu', 'POKEBALL-PIKACHU', 1400, 1, 'pokeballs-04,pokeballs-05,pokeballs-06'),
+  ('Pokeball Eevee', 'POKEBALL-EEVEE', 1400, 1, 'pokeballs-07'),
+  ('Pokeball Bulbasaur', 'POKEBALL-BULBASAUR', 1400, 1, 'pokeballs-08'),
+  ('Pokeball Charmander', 'POKEBALL-CHARMANDER', 1400, 1, 'pokeballs-09')
+) as v(name, sku, price, pieces, files),
+(select 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/'::text as base) b
+on conflict (sku) do nothing;

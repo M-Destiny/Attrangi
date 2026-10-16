@@ -24,8 +24,8 @@ const utils = {
   renderSearchItem: (res: any) => `
     <div class="card flex items-center justify-between hover:bg-surface-container-low transition-colors cursor-pointer">
        <div class="flex items-center gap-4">
-          <div class="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-surface-container-highest">
-             ${res.image ? `<img src="${res.image}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center opacity-40">${res.type === 'Product' ? ICONS.inventory : ICONS.invoices}</div>`}
+          <div class="rounded-lg overflow-hidden bg-surface-container-highest" style="width:44px;height:44px;flex:none">
+             ${res.image ? `<img src="${res.image}" style="width:44px;height:44px;min-width:44px;max-width:44px;object-fit:cover;border-radius:8px;flex:none;display:block;background:#eee" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">` : `<div class="w-full h-full flex items-center justify-center opacity-40">${res.type === 'Product' ? ICONS.inventory : ICONS.invoices}</div>`}
           </div>
           <div>
              <p class="font-bold">${res.title}</p>
@@ -349,7 +349,7 @@ const views: any = {
              ${(topSelling || []).map((ts: any) => `
                <li class="flex items-center gap-4" style="display: flex; align-items: center; gap: 1rem;">
                   <div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-primary overflow-hidden" style="width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-center; overflow: hidden; flex-shrink: 0;">
-                      ${ts.image ? `<img src="${ts.image}" class="w-full h-full object-cover" style="width: 100%; height: 100%; object-fit: cover;">` : ICONS.inventory}
+                      ${ts.image ? `<img src="${ts.image}" style="width:44px;height:44px;min-width:44px;max-width:44px;object-fit:cover;border-radius:8px;flex:none;display:block;background:#eee" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">` : ICONS.inventory}
                   </div>
                   <div>
                      <p class="font-bold text-sm">${ts.name}</p>
@@ -388,11 +388,11 @@ const views: any = {
           <tbody>
              ${state.products.map((p: any) => `
                <tr>
-                  <td class="font-bold flex items-center gap-3">
-                     <div class="rounded-lg bg-surface-container-highest overflow-hidden shrink-0" style="width:3rem;height:3rem">
-                        ${(p.image_url || (p.images ?? [])[0]) ? `<img src="${p.image_url || (p.images ?? [])[0]}" loading="lazy" style="width:100%;height:100%;object-fit:cover">` : `<div class="w-full h-full flex items-center justify-center opacity-40">${ICONS.inventory}</div>`}
+                  <td class="font-bold"><div style="display:flex;align-items:center;gap:.75rem">
+                     <div class="rounded-lg bg-surface-container-highest overflow-hidden" style="width:44px;height:44px;min-width:44px;flex:none">
+                        ${(p.image_url || (p.images ?? [])[0]) ? `<img src="${p.image_url || (p.images ?? [])[0]}" style="width:44px;height:44px;min-width:44px;max-width:44px;object-fit:cover;border-radius:8px;flex:none;display:block;background:#eee" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">` : `<div class="w-full h-full flex items-center justify-center opacity-40">${ICONS.inventory}</div>`}
                      </div>
-                     ${p.name}
+                     ${p.name}</div>
                   </td>
                   <td class="font-mono text-xs">${p.sku}</td>
                   <td><span class="text-xs px-2 py-1 rounded-full" style="background: var(--surface-container-highest)">${p.category}</span></td>
