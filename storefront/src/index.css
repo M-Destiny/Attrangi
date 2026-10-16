@@ -1,0 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Epilogue:wght@500;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+@theme {
+  --color-brand: #E87AAE; --color-brand-dark: #d4609a; --color-sky: #5FA8C9; --color-sun: #F4D21F;
+  --color-ink: #1a1a1a; --color-muted: #666; --color-line: #eee; --color-soft: #fdf5f9;
+  --font-display: 'Epilogue', sans-serif; --font-sans: 'Plus Jakarta Sans', sans-serif;
+}
+body { font-family: var(--font-sans); color: var(--color-ink); background: #fff; }
+h1,h2,h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
