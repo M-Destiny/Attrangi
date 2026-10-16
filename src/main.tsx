@@ -94,7 +94,10 @@ const state: any = {
   searchResults: [],
   searchQuery: '',
   searchTimeout: null,
+  uploadingImages: false,
+  pendingImageRemovals: [] as string[],
   newProduct: {
+    images: [] as string[],
     name: '',
     sku: '',
     selling_price: 0,
@@ -386,8 +389,8 @@ const views: any = {
              ${state.products.map((p: any) => `
                <tr>
                   <td class="font-bold flex items-center gap-3">
-                     <div class="w-8 h-8 rounded bg-surface-container-highest overflow-hidden">
-                        ${p.image_url ? `<img src="${p.image_url}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center opacity-40">${ICONS.inventory}</div>`}
+                     <div class="rounded-lg bg-surface-container-highest overflow-hidden shrink-0" style="width:3rem;height:3rem">
+                        ${(p.image_url || (p.images ?? [])[0]) ? `<img src="${p.image_url || (p.images ?? [])[0]}" loading="lazy" style="width:100%;height:100%;object-fit:cover">` : `<div class="w-full h-full flex items-center justify-center opacity-40">${ICONS.inventory}</div>`}
                      </div>
                      ${p.name}
                   </td>
@@ -436,15 +439,21 @@ const views: any = {
         </div>
         <div class="card">
            <h3 class="font-bold text-xl mb-6">Media Gallery</h3>
-           <div class="flex flex-wrap gap-4">
-              <div id="image-upload-drop" class="w-full sm:w-60 h-60 border-2 dashed border-outline rounded-3xl flex items-center justify-center bg-surface-container-low cursor-pointer" onclick="app.handlers.uploadImage()">
-                 <div class="text-center">
-                    <div class="bg-primary w-12 h-12 rounded-full flex items-center justify-center mx-auto color-white">${ICONS.add}</div>
-                    <p class="font-bold mt-2 text-sm">Upload Photo</p>
-                    <p class="text-[10px] opacity-40 mt-1">Supabase Storage Ready</p>
-                 </div>
-              </div>
+           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(8.5rem,1fr));gap:1rem">
+              ${(state.newProduct.images || []).map((u: string, i: number) => `
+                <div class="rounded-2xl overflow-hidden bg-surface-container-low" style="border:1px solid var(--outline-variant, #ddd)">
+                  <div style="position:relative;aspect-ratio:1/1">
+                    <img src="${u}" class="w-full h-full object-cover" style="width:100%;height:100%;object-fit:cover">
+                    ${i === 0 ? `<span style="position:absolute;top:.4rem;left:.4rem;background:var(--primary,#E87AAE);color:#fff;font-size:.6rem;font-weight:900;padding:.1rem .5rem;border-radius:999px">Main</span>` : ''}
+                  </div>
+                  <div class="flex gap-1 p-2">
+                    ${i !== 0 ? `<button class="btn btn-outline small" style="flex:1" onclick="app.handlers.handleMakeMainImage(${i})">Make main</button>` : ''}
+                    <button class="btn btn-outline small" style="flex:1" onclick="app.handlers.handleRemoveImage(${i})">Remove</button>
+                  </div>
+                </div>`).join('')}
            </div>
+           <button class="btn btn-primary mt-4" ${state.uploadingImages ? 'disabled' : ''} onclick="app.handlers.uploadImage()">${state.uploadingImages ? 'Uploading...' : `${ICONS.add} Add images`}</button>
+           <p class="text-[10px] opacity-60 mt-2">JPEG, PNG or WebP, max 5MB each. First image is the main image.</p>
         </div>
       </div>
       <div class="md:w-25rem space-y-8">
@@ -1364,7 +1373,8 @@ const app = {
       // Reset specific view states
       if (view !== 'add-product') {
         state.editingProductId = null;
-        state.newProduct = { name: '', sku: '', selling_price: 0, stock_level: 0, category: 'Jewelry' };
+        state.newProduct = { name: '', sku: '', selling_price: 0, stock_level: 0, category: 'Jewelry', images: [] };
+        state.pendingImageRemovals = [];
       }
 
       if (view === 'create-invoice') {
@@ -1435,7 +1445,8 @@ const app = {
           sku: prod.sku,
           selling_price: prod.selling_price,
           stock_level: prod.stock_level,
-          category: prod.category
+          category: prod.category,
+          images: (prod.images && prod.images.length ? prod.images : (prod.image_url ? [prod.image_url] : []))
         };
       }
       state.editingProductId = id;
@@ -2235,39 +2246,95 @@ const app = {
       html2pdf().from(element).set(opt).save();
     },
 
-    uploadImage: async () => {
+    uploadImage: () => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = async (e: any) => {
-        const file = e.target.files[0];
-        if (file) {
-          alert(`Uploading ${file.name} to Supabase Storage...`);
-          // Implementation using supabase.storage.from('products').upload()
+      input.accept = 'image/jpeg,image/png,image/webp';
+      input.multiple = true;
+      input.onchange = async () => {
+        const files = Array.from(input.files || []);
+        const okTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        state.uploadingImages = true;
+        app.render();
+        const errors: string[] = [];
+        for (const file of files) {
+          if (!okTypes.includes(file.type)) { errors.push(`${file.name}: only JPEG, PNG or WebP allowed`); continue; }
+          if (file.size > 5 * 1024 * 1024) { errors.push(`${file.name}: larger than 5MB`); continue; }
+          try {
+            // Downscale to max 1200px JPEG q0.82 (falls back to the original file on any failure)
+            let body: Blob = file, ext = file.name.split('.').pop()?.toLowerCase() || 'jpg', type = file.type;
+            try {
+              const bmp = await createImageBitmap(file);
+              const k = Math.min(1, 1200 / Math.max(bmp.width, bmp.height));
+              const c = document.createElement('canvas');
+              c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+              const ctx = c.getContext('2d')!;
+              ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+              ctx.drawImage(bmp, 0, 0, c.width, c.height);
+              const blob: Blob | null = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.82));
+              if (blob) { body = blob; ext = 'jpg'; type = 'image/jpeg'; }
+            } catch (_) { /* keep original */ }
+            const base = (state.newProduct.sku || state.editingProductId || 'product').toString().replace(/[^A-Za-z0-9_-]/g, '_');
+            const path = `${base}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+            const { error } = await supabase.storage.from('product-images').upload(path, body, { contentType: type, upsert: false, cacheControl: '31536000' });
+            if (error) throw error;
+            state.newProduct.images.push(supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl);
+          } catch (err: any) {
+            errors.push(`${file.name}: ${err.message}`);
+          }
         }
+        state.uploadingImages = false;
+        app.render();
+        if (errors.length) alert(`Upload failed: ${errors.join('; ')}`);
       };
       input.click();
     },
-    
+
+    handleMakeMainImage: (i: number) => {
+      const [u] = state.newProduct.images.splice(i, 1);
+      state.newProduct.images.unshift(u);
+      app.render();
+    },
+
+    handleRemoveImage: (i: number) => {
+      const [u] = state.newProduct.images.splice(i, 1);
+      state.pendingImageRemovals.push(u); // storage delete deferred until the product is saved
+      app.render();
+    },
+
     handleSaveProduct: async () => {
       const btn = event?.target as HTMLButtonElement;
       if (btn) btn.disabled = true;
-      
+
       try {
-        const { error } = await supabase.from('products').upsert([
-          {
-            ...(state.editingProductId ? { id: state.editingProductId } : {}),
-            name: state.newProduct.name,
-            sku: state.newProduct.sku,
-            selling_price: state.newProduct.selling_price,
-            stock_level: state.newProduct.stock_level,
-            category: state.newProduct.category,
-            brand: 'Attrangii Premium'
-          }
-        ]);
-        
+        const imgs: string[] = state.newProduct.images || [];
+        const row: any = {
+          ...(state.editingProductId ? { id: state.editingProductId } : {}),
+          name: state.newProduct.name,
+          sku: state.newProduct.sku,
+          selling_price: state.newProduct.selling_price,
+          stock_level: state.newProduct.stock_level,
+          category: state.newProduct.category,
+          brand: 'Attrangii Premium',
+          image_url: imgs[0] ?? null,
+          images: imgs
+        };
+        let { error } = await supabase.from('products').upsert([row]);
+        if (error && /images/i.test(error.message || '')) {
+          // `images` column missing (migration not run): retry without it
+          delete row.images;
+          ({ error } = await supabase.from('products').upsert([row]));
+        }
         if (error) throw error;
-        
+
+        // Best-effort cleanup of removed images that live in our bucket
+        const marker = '/product-images/';
+        const paths = state.pendingImageRemovals
+          .filter((u: string) => !imgs.includes(u) && u.includes(marker))
+          .map((u: string) => decodeURIComponent(u.split(marker)[1].split('?')[0]));
+        state.pendingImageRemovals = [];
+        if (paths.length) await supabase.storage.from('product-images').remove(paths).catch(() => {});
+
         alert('Product specification successfully persisted.');
         app.handlers.handleInitializeData();
         app.router.navigate('products');
