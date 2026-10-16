@@ -6,3 +6,4 @@ upload-staging
 
 .vercel
 .env*
+!.env.example
