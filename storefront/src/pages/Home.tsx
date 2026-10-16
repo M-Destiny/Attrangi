@@ -51,12 +51,12 @@ export default function Home() {
             )}
             <section aria-labelledby="new" className="py-8">
               <div className="mb-6 flex items-end justify-between">
-                <h2 id="new" className="text-2xl font-black">New arrivals</h2>
-                <Link to="/shop" className={`rounded text-sm font-semibold text-brand-dark hover:underline ${ring}`}>View all</Link>
+                <h2 id="new" className="text-2xl font-black">All products <span className="text-base font-semibold text-muted">({products.length})</span></h2>
+                <Link to="/shop" className={`rounded text-sm font-semibold text-brand-dark hover:underline ${ring}`}>Browse &amp; filter</Link>
               </div>
               {products.length === 0 ? <p className="text-muted">New products coming soon.</p> : (
                 <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">
-                  {products.slice(0, 8).map(p => <ProductCard key={p.id} product={p} />)}
+                  {products.map(p => <ProductCard key={p.id} product={p} />)}
                 </div>
               )}
             </section>
