@@ -5,4 +5,5 @@ import './index.css';
 import { CartProvider } from './lib/cart';
 import { AuthProvider } from './lib/auth';
 import App from './App';
-createRoot(document.getElementById('root')!).render(<StrictMode><BrowserRouter><AuthProvider><CartProvider><App /></CartProvider></AuthProvider></BrowserRouter></StrictMode>);
+import { Analytics } from '@vercel/analytics/react';
+createRoot(document.getElementById('root')!).render(<StrictMode><BrowserRouter><AuthProvider><CartProvider><App /><Analytics /></CartProvider></AuthProvider></BrowserRouter></StrictMode>);
