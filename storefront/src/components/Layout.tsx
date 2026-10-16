@@ -60,6 +60,10 @@ export default function Layout() {
           </nav>
           <p>&copy; {new Date().getFullYear()} Attrangii</p>
         </div>
+        <p className="pb-6 text-center text-xs font-bold uppercase tracking-widest text-muted opacity-60 transition-opacity hover:opacity-100">
+          Made with <span aria-label="love" role="img">❤️</span> by{' '}
+          <a href="https://github.com/M-Destiny" target="_blank" rel="noopener noreferrer" className={`rounded text-brand-dark underline decoration-brand/30 underline-offset-4 ${ring}`}>Destiny</a>
+        </p>
       </footer>
       <CartDrawer />
     </div>
