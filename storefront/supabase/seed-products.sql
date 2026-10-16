@@ -1,4 +1,4 @@
--- Attrangii: inventory seed (26 products). Run in the Supabase SQL Editor (runs as admin, so it bypasses RLS).
+-- Attrangii: inventory seed (55 products in total across the statements below). Run in the Supabase SQL Editor (runs as admin, so it bypasses RLS).
 -- Stores resale price (selling_price) and pieces (stock_level) only; buying_price stays 0 (wholesale not kept).
 -- Run storefront.sql FIRST (it adds products.images). Safe to re-run: existing SKUs keep their stock/price; only missing images are filled.
 -- Images live in the Supabase 'product-images' bucket (public). A NULL image_url shows the placeholder.

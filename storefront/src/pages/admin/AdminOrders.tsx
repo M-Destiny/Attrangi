@@ -67,7 +67,7 @@ export default function AdminOrders() {
           <h1 className="text-xl font-black mr-auto">Orders</h1>
           <span className="text-sm text-muted truncate max-w-[14rem]">{session.user.email}</span>
           <nav aria-label="Admin" className="flex gap-3 text-sm">
-            <Link to="/admin/orders" aria-current="page" className="font-semibold underline underline-offset-4">Orders</Link>
+            <Link to="/admin" aria-current="page" className="font-semibold underline underline-offset-4">Orders</Link>
             <Link to="/admin/coupons" className="text-brand-dark hover:underline">Coupons</Link>
           </nav>
           <Link to="/" className="text-sm text-brand-dark hover:underline">Storefront</Link>
