@@ -83,7 +83,7 @@ function categoryList(): string[] {
   });
   return [...seen.values()].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 }
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 function categoryFieldHtml(): string {
   const cats = categoryList();
   let cur = String(state.newProduct.category || '').trim();
@@ -427,7 +427,7 @@ const views: any = {
                      ${p.name}${p.show_on_storefront === false ? ' <span style="font-size:.65rem;font-weight:600;padding:.1rem .5rem;border-radius:999px;background:#e5e7eb;color:#4b5563;white-space:nowrap">Hidden on website</span>' : ''}</div>
                   </td>
                   <td class="font-mono text-xs">${p.sku}</td>
-                  <td><span class="text-xs px-2 py-1 rounded-full" style="background: var(--surface-container-highest)">${p.category}</span></td>
+                  <td><span class="text-xs px-2 py-1 rounded-full" style="background: var(--surface-container-highest)">${esc(p.category)}</span></td>
                   <td>${p.brand || 'Luxury'}</td>
                   <td class="font-bold">₹${(p.selling_price || 0).toLocaleString('en-IN')}</td>
                   <td><span class="text-xs px-2 py-1 rounded-full" style="background: var(--surface-container); color: ${p.stock_level < p.low_stock_threshold ? 'var(--error)' : 'var(--secondary)'}">${p.stock_level} in stock</span></td>
@@ -936,7 +936,7 @@ const views: any = {
                 return `
                    <div class="flex flex-col" style="gap: 0.5rem;">
                       <div class="flex justify-between text-xs font-bold uppercase opacity-60">
-                         <span>${cat.name}</span>
+                         <span>${esc(cat.name)}</span>
                          <span>${cat.pct}%</span>
                       </div>
                       <div style="width: 100%; height: 8px; background: var(--surface-container-highest); border-radius: 9999px; overflow: hidden;">
@@ -2374,7 +2374,7 @@ const app = {
       else state.newProduct.category = sel.value;
     },
     newCategoryTyped: (inp: HTMLInputElement) => {
-      const v = inp.value.trim().slice(0, 40);
+      const v = inp.value.replace(/[<>]/g, '').trim().slice(0, 40); // markup characters are never valid in a category name
       const existing = categoryList().find(c => c.toLowerCase() === v.toLowerCase());
       if (v && existing) {
         // duplicate: switch to the existing category
