@@ -84,6 +84,120 @@ function categoryList(): string[] {
   return [...seen.values()].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 }
 const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// --- Invoice PDF template (A4) ---
+function amountInWords(n: number): string {
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const below100 = (x: number) => x < 20 ? ones[x] : tens[Math.floor(x / 10)] + (x % 10 ? ' ' + ones[x % 10] : '');
+  const below1000 = (x: number) => (x >= 100 ? ones[Math.floor(x / 100)] + ' Hundred' + (x % 100 ? ' ' : '') : '') + (x % 100 ? below100(x % 100) : '');
+  const total = Math.round(Math.max(0, Number(n) || 0) * 100);
+  const rupees = Math.floor(total / 100), paise = total % 100;
+  const parts: string[] = [];
+  let rest = rupees;
+  const crore = Math.floor(rest / 10000000); rest %= 10000000;
+  const lakh = Math.floor(rest / 100000); rest %= 100000;
+  const thousand = Math.floor(rest / 1000); rest %= 1000;
+  if (crore) parts.push(below1000(crore) + ' Crore');
+  if (lakh) parts.push(below100(lakh) + ' Lakh');
+  if (thousand) parts.push(below100(thousand) + ' Thousand');
+  if (rest) parts.push(below1000(rest));
+  let out = 'Rupees ' + (parts.join(' ') || 'Zero');
+  if (paise) out += ' and ' + below100(paise) + ' Paise';
+  return out + ' Only';
+}
+
+function buildInvoiceHtml(inv: any, logoSrc: string): string {
+  const money = (v: any) => '₹' + (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const items: any[] = inv.items || [];
+  const { subtotal, taxAmount, total: calcTotal } = utils.calculateInvoiceTotals({ ...inv, items });
+  const total = Number.isFinite(calcTotal) ? calcTotal : (Number(inv.amount) || 0);
+  const discount = Number(inv.discount) || 0, shipping = Number(inv.shipping) || 0, taxRate = Number(inv.taxRate) || 0;
+  const status = String(inv.status || '').toLowerCase().replace(/[\s-]+/g, '_');
+  const pill: Record<string, [string, string, string]> = {
+    paid: ['PAID', '#E3F6EA', '#1E8E4E'], unpaid: ['UNPAID', '#FDE8E8', '#C0392B'], overdue: ['OVERDUE', '#FDE8E8', '#C0392B'],
+    partially_paid: ['PARTIAL', '#FFF3D6', '#B7791F'], cancelled: ['CANCELLED', '#ECECEC', '#666']
+  };
+  const [pLabel, pBg, pFg] = pill[status] || [esc(String(inv.status || '').toUpperCase()), '#ECECEC', '#666'];
+  const billed = [inv.customer_phone && '📞 ' + esc(inv.customer_phone), inv.customer_email && esc(inv.customer_email), inv.customer_address && esc(inv.customer_address)]
+    .filter(Boolean).map(l => `<div class="line">${l}</div>`).join('');
+  const meta = (label: string, val: string) => `<div class="meta"><span>${label}</span><b>${val}</b></div>`;
+  const row = (label: string, val: string) => `<div class="trow"><span>${label}</span><b>${val}</b></div>`;
+  return `
+<style>
+.inv{width:794px;box-sizing:border-box;background:#fff;color:#222;font-family:'Plus Jakarta Sans','Segoe UI',Arial,sans-serif;font-size:13px;line-height:1.45;display:flex;flex-direction:column;min-height:1100px}
+.inv *{box-sizing:border-box}.inv .in{padding:0 44px 24px;flex:1}
+.inv h1,.inv h2,.inv .brand{font-family:'Epilogue','Plus Jakarta Sans','Segoe UI',Arial,sans-serif;margin:0}
+.inv .band{display:flex;justify-content:space-between;align-items:center;padding:30px 44px 22px;border-bottom:3px solid #E87AAE;background:#FFF6FA}
+.inv .logo{display:flex;align-items:center;gap:14px}.inv .logo img{height:58px;width:auto;object-fit:contain}
+.inv .brand{font-size:28px;font-weight:800;color:#222;letter-spacing:-.5px}.inv .tag{font-size:12px;color:#5FA8C9;font-weight:600;letter-spacing:.5px}
+.inv .contact{text-align:right;font-size:11.5px;color:#555;line-height:1.7}
+.inv .title{display:flex;justify-content:space-between;align-items:flex-start;margin-top:26px}
+.inv h1{font-size:38px;font-weight:800;color:#E87AAE;letter-spacing:1px;line-height:1}
+.inv .num{font-size:14px;font-weight:700;margin-top:8px;color:#222}
+.inv .meta{display:flex;justify-content:flex-end;gap:10px;font-size:12px;color:#777;margin-bottom:3px}.inv .meta b{color:#222;min-width:90px;text-align:right}
+.inv .pill{display:inline-block;padding:4px 16px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:1px;margin-top:6px}
+.inv .recv{font-size:11.5px;color:#777;margin-top:4px}
+.inv .bill{margin-top:22px;border:1px solid #F3D3E3;border-left:5px solid #F4D21F;border-radius:10px;padding:14px 18px;width:55%;background:#fff;page-break-inside:avoid}
+.inv .lbl{font-size:10px;font-weight:800;letter-spacing:1.5px;color:#5FA8C9;text-transform:uppercase;margin-bottom:6px}
+.inv .cname{font-family:'Epilogue','Plus Jakarta Sans',Arial,sans-serif;font-size:17px;font-weight:700}.inv .line{font-size:12px;color:#555;margin-top:2px}
+.inv table{width:100%;border-collapse:collapse;margin-top:24px}
+.inv thead{display:table-header-group}
+.inv th{background:#E87AAE;color:#fff;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:10px 12px;text-align:left}
+.inv td{padding:10px 12px;font-size:12.5px;border-bottom:1px solid #F4E4EC;vertical-align:top}
+.inv tr{page-break-inside:avoid;break-inside:avoid}.inv tbody tr:nth-child(even) td{background:#FFF6FA}
+.inv .r{text-align:right}.inv .c{text-align:center}
+.inv .bottom{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-top:20px;page-break-inside:avoid;break-inside:avoid}
+.inv .words{flex:1;font-size:12px;color:#555;padding-top:6px}.inv .words b{display:block;color:#222;font-size:12.5px;margin-top:3px}
+.inv .tot{width:270px}.inv .trow{display:flex;justify-content:space-between;padding:6px 4px;font-size:12.5px;color:#555;border-bottom:1px dashed #eee}.inv .trow b{color:#222}
+.inv .grand{margin-top:10px;background:#E87AAE;color:#fff;border-radius:10px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center}
+.inv .grand span{font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase}.inv .grand b{font-family:'Epilogue','Plus Jakarta Sans',Arial,sans-serif;font-size:22px;font-weight:800}
+.inv .foot{margin-top:46px;text-align:center;page-break-inside:avoid;break-inside:avoid}
+.inv .thanks{font-family:'Epilogue','Plus Jakarta Sans',Arial,sans-serif;font-size:15px;font-weight:700;color:#E87AAE}
+.inv .sub{font-size:10.5px;color:#999;margin-top:5px}
+.inv .bar{display:flex;height:6px;margin-top:auto}.inv .bar i{flex:1}
+</style>
+<div class="inv">
+  <div class="band">
+    <div class="logo"><img src="${logoSrc}" alt="Attrangii"><div><div class="brand">Attrangii</div><div class="tag">Toys &amp; collectibles</div></div></div>
+    <div class="contact">📞 7506131372<br>Instagram @attrangii_<br>attrangii-store.vercel.app</div>
+  </div>
+  <div class="in">
+    <div class="title">
+      <div><h1>INVOICE</h1><div class="num">${esc(inv.id)}</div></div>
+      <div style="text-align:right">
+        ${meta('Issue date', esc(inv.date))}${inv.due_date ? meta('Due date', esc(inv.due_date)) : ''}
+        <span class="pill" style="background:${pBg};color:${pFg}">${pLabel}</span>
+        ${status === 'paid' && inv.paid_to ? `<div class="recv">Received by <b>${esc(inv.paid_to)}</b></div>` : ''}
+      </div>
+    </div>
+    <div class="bill"><div class="lbl">Billed to</div><div class="cname">${esc(inv.customer || 'Walk-in Client')}</div>${billed}</div>
+    <table>
+      <thead><tr><th style="width:36px">#</th><th>Item</th><th class="c" style="width:50px">Qty</th><th class="r" style="width:100px">Rate</th><th class="r" style="width:110px">Amount</th></tr></thead>
+      <tbody>${items.map((it, i) => {
+        const q = Number(it.quantity ?? it.qty) || 0, p = Number(it.unit_price ?? it.price) || 0;
+        return `<tr><td>${i + 1}</td><td>${esc(it.description || 'Item')}</td><td class="c">${q}</td><td class="r">${money(p)}</td><td class="r"><b>${money(it.total_price ?? q * p)}</b></td></tr>`;
+      }).join('')}</tbody>
+    </table>
+    <div class="bottom">
+      <div class="words">Amount in words<b>${amountInWords(total)}</b></div>
+      <div class="tot">
+        ${row('Subtotal', money(subtotal))}
+        ${discount > 0 ? row('Discount', '− ' + money(discount)) : ''}
+        ${taxRate > 0 ? row(`Tax (${taxRate}%)`, money(taxAmount)) : ''}
+        ${shipping > 0 ? row('Shipping', money(shipping)) : ''}
+        <div class="grand"><span>Total</span><b>${money(total)}</b></div>
+      </div>
+    </div>
+    <div class="foot">
+      <div class="thanks">Thank you for shopping with Attrangii!</div>
+      <div class="sub">This is a computer-generated invoice</div>
+      <div class="sub">Made with ❤️ by Destiny</div>
+    </div>
+  </div>
+  <div class="bar"><i style="background:#E87AAE"></i><i style="background:#F4D21F"></i><i style="background:#5FA8C9"></i></div>
+</div>`;
+}
+
 function categoryFieldHtml(): string {
   const cats = categoryList();
   let cur = String(state.newProduct.category || '').trim();
@@ -1514,7 +1628,7 @@ const app = {
       // Invoices
       const { data: invs } = await supabase.from('invoices').select(`
         *,
-        customers (name)
+        customers (name, phone, email, address)
       `).order('created_at', { ascending: false });
       // Fetch items for top selling logic and invoice view
       const { data: items } = await supabase.from('invoice_items').select('*');
@@ -1524,6 +1638,10 @@ const app = {
          db_id: i.id,
          customer: i.customers?.name || 'Walk-in Client',
          customer_id: i.customer_id,
+         customer_phone: i.customers?.phone || '',
+         customer_email: i.customers?.email || '',
+         customer_address: i.customers?.address || '',
+         due_date: i.due_date ? new Date(i.due_date).toLocaleDateString() : '',
          discount: i.discount_amount || 0,
          taxRate: i.tax_rate || 0,
          shipping: Number(i.shipping_fee) || 0,
@@ -2199,112 +2317,28 @@ const app = {
       }, 300);
     },
 
-    handleGeneratePDF: (id: string) => {
+    handleGeneratePDF: async (id: string) => {
       const inv = state.invoices.find((i: any) => i.id === id);
       if (!inv) return;
 
+      // Inline the logo as a data URL so html2canvas always has it loaded.
+      let logoSrc = logoUrl;
+      try {
+        const blob = await (await fetch(logoUrl)).blob();
+        logoSrc = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(blob); });
+      } catch { /* fall back to the plain URL */ }
+
       const element = document.createElement('div');
       element.className = 'printable-invoice';
-      element.innerHTML = `
-        <div style="font-family: 'Plus Jakarta Sans', sans-serif;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4rem; border-bottom: 8px solid #E87AAE; padding-bottom: 2rem;">
-            <div>
-              <div style="display: flex; align-items: center; gap: 1rem;">
-                <img src="${logoUrl}" alt="Logo" style="height: 3.5rem; object-fit: contain;">
-                <h1 style="font-size: 3rem; font-weight: 900; letter-spacing: -2px; margin: 0; color: #1a1a1a;">ATTRANGII</h1>
-              </div>
-              <div style="margin-top: 1rem; font-size: 0.8rem; color: #444;">
-                <p>GSTIN: 27AAAAA0000A1Z5</p>
-              </div>
-            </div>
-            <div style="text-align: right;">
-              <h2 style="font-size: 1.2rem; font-weight: 900; color: #E87AAE; margin: 0;">TAX INVOICE</h2>
-              <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.25rem;">
-                <p style="margin: 0; font-size: 0.7rem; color: #999; font-weight: 700;">INVOICE NUMBER</p>
-                <p style="margin: 0; font-weight: 900; font-size: 1.2rem;">${inv.id}</p>
-                <p style="margin: 1rem 0 0.25rem; font-size: 0.7rem; color: #999; font-weight: 700;">DATE OF ISSUE</p>
-                <p style="margin: 0; font-weight: 800;">${inv.date}</p>
-              </div>
-            </div>
-          </div>
-
-          <div style="margin-bottom: 4rem;">
-            <div style="background: #F8F9FA; padding: 2rem; border-radius: 1rem; max-width: 50%;">
-              <p style="text-transform: uppercase; font-size: 0.6rem; color: #999; font-weight: 900; tracking: 0.1em; margin-bottom: 1rem;">Recipient Information</p>
-              <p style="font-weight: 800; font-size: 1.25rem; margin: 0;">${inv.customer}</p>
-            </div>
-          </div>
-
-          <table style="width: 100%; border-collapse: collapse; margin-bottom: 3rem;">
-            <thead>
-              <tr style="border-bottom: 2px solid #1a1a1a;">
-                <th style="padding: 1.5rem 1rem; text-align: left; font-size: 0.65rem; font-weight: 900; color: #999;">DESCRIPTION</th>
-                <th style="padding: 1.5rem 1rem; text-align: center; font-size: 0.65rem; font-weight: 900; color: #999;">QTY</th>
-                <th style="padding: 1.5rem 1rem; text-align: right; font-size: 0.65rem; font-weight: 900; color: #999;">UNIT PRICE</th>
-                <th style="padding: 1.5rem 1rem; text-align: right; font-size: 0.65rem; font-weight: 900; color: #999;">TOTAL AMOUNT</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${(inv.items || []).map((item: any) => `
-              <tr>
-                <td style="padding: 2rem 1rem; border-bottom: 1px solid #eee;">
-                  <p style="font-weight: 800; font-size: 1rem; margin: 0;">${item.description}</p>
-                </td>
-                <td style="padding: 2rem 1rem; text-align: center; border-bottom: 1px solid #eee; font-weight: 800;">${item.quantity}</td>
-                <td style="padding: 2rem 1rem; text-align: right; border-bottom: 1px solid #eee; font-weight: 800;">₹${item.unit_price.toLocaleString('en-IN')}</td>
-                <td style="padding: 2rem 1rem; text-align: right; border-bottom: 1px solid #eee; font-weight: 900; font-size: 1.1rem;">₹${item.total_price.toLocaleString('en-IN')}</td>
-              </tr>
-              `).join('')}
-            </tbody>
-          </table>
-
-          <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
-            <div style="width: 22rem;">
-              <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; padding: 0 1rem;">
-                 <p style="color: #666; font-size: 0.9rem;">Subtotal</p>
-                 <p style="font-weight: 800; font-size: 0.9rem;">₹${(inv.amount - (inv.shipping || 0)).toLocaleString('en-IN')}</p>
-              </div>
-              ${inv.shipping > 0 ? `<div style="display: flex; justify-content: space-between; margin-bottom: 1rem; padding: 0 1rem;">
-                 <p style="color: #666; font-size: 0.9rem;">Shipping</p>
-                 <p style="font-weight: 800; font-size: 0.9rem;">₹${inv.shipping.toLocaleString('en-IN')}</p>
-              </div>` : ''}
-              <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem; padding: 0 1rem;">
-                 <p style="color: #666; font-size: 0.9rem;">Tax / GST</p>
-                 <p style="font-weight: 800; font-size: 0.9rem;">₹0.00</p>
-              </div>
-              <div style="background: #1a1a1a; color: white; padding: 2rem; border-radius: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                 <div>
-                   <p style="text-transform: uppercase; font-size: 0.6rem; font-weight: 900; margin: 0; opacity: 0.6;">Grand Total Due</p>
-                   <p style="font-size: 0.75rem; margin: 0.25rem 0 0; opacity: 0.4;">Includes all applicable taxes</p>
-                 </div>
-                 <p style="font-weight: 900; font-size: 2rem; margin: 0;">₹${inv.amount.toLocaleString('en-IN')}</p>
-              </div>
-            </div>
-          </div>
-
-          <div style="margin-top: 4rem; padding: 2rem; border: 1px dashed #eee; border-radius: 1rem; page-break-inside: avoid; break-inside: avoid;">
-            <p style="font-size: 0.75rem; font-weight: 800; margin-bottom: 0.5rem; text-transform: uppercase; tracking: 0.1em;">Terms & Conditions</p>
-            <p style="font-size: 0.65rem; color: #888; line-height: 1.6;">
-              1. This invoice is subject to Attrangii's Master Service Agreement.<br>
-              2. Payment is due within 15 days of the invoice date.<br>
-              3. Late payments may incur interest charges as per standard industry norms.<br>
-              4. All disputes are subject to Mumbai Jurisdiction.
-            </p>
-          </div>
-
-          <div style="margin-top: 6rem; text-align: center; page-break-inside: avoid; break-inside: avoid;">
-             <p style="font-size: 0.75rem; color: #999; font-weight: 700;">Thank you for choosing ATTRANGII.</p>
-             <div style="width: 4rem; height: 4px; background: #E87AAE; margin: 1.5rem auto 0;"></div>
-          </div>
-        </div>
-      `;
+      element.innerHTML = buildInvoiceHtml(inv, logoSrc);
 
       const opt: any = {
         margin: 0,
         filename: `Invoice_${inv.id}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' }
       };
 
       html2pdf().from(element).set(opt).save();
