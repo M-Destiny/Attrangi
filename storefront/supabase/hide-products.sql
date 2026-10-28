@@ -22,7 +22,8 @@ update public.products set show_on_storefront = false where sku in (
   'F1-BLOCKS',
   'POKEBALL-SQUIRTLE',
   'TERMINATOR',
-  'PREDATOR'
+  'PREDATOR',
+  'POKEBALL-MEOWTH'
 );
 
 create or replace view public.storefront_products as

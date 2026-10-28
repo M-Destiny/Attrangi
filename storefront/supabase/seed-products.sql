@@ -117,7 +117,8 @@ update public.products set show_on_storefront = false where sku in (
   'F1-BLOCKS',
   'POKEBALL-SQUIRTLE',
   'TERMINATOR',
-  'PREDATOR'
+  'PREDATOR',
+  'POKEBALL-MEOWTH'
 );
 
 -- Actual Pokeball stock: only Meowth is in stock; the other designs are sold out.

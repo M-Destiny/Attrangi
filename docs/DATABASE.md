@@ -235,7 +235,7 @@ where lower(coalesce(category,'')) not in ('pins','pin');
 ```
 - **Exposed:** id, name, sku, category, brand, selling_price, stock_level, image_url, created_at, images.
 - **Hidden:** buying_price, supplier_id, serial_number, low_stock_threshold, updated_at.
-- **Hidden products:** rows with `show_on_storefront = false` are excluded, and so are the products they stand for in `quote_order` / `place_order` ("Product not found"). `storefront/supabase/hide-products.sql` is the patch that added the switch and hid the first 21 products.
+- **Hidden products:** rows with `show_on_storefront = false` are excluded, and so are the products they stand for in `quote_order` / `place_order` ("Product not found"). `storefront/supabase/hide-products.sql` is the patch that added the switch and hid the first 22 products.
 - **Pins filter:** category `pins` or `pin` (case-insensitive) is excluded. `place_order` and `quote_order` also refuse/ignore Pins, so they cannot be bought by crafting an RPC call.
 - **Grants:** `revoke all ... from anon, authenticated; grant select ... to anon, authenticated;`. The view runs as its owner (bypasses `products` RLS, and is auto-updatable), hence the explicit SELECT-only grant.
 
@@ -471,7 +471,7 @@ Codes must be uppercase, 3-32 chars. Staff can see usage via `admin_coupons()`.
 
 ## 11. Current catalog (after seed)
 
-55 products in total, of which 21 are hidden from the store with `show_on_storefront = false` (34 visible). The Pins category exists in the DB and CRM but has no seeded rows; it is hidden by the view and refused by `place_order` / `quote_order`.
+55 products in total, of which 22 are hidden from the store with `show_on_storefront = false` (33 visible). The Pins category exists in the DB and CRM but has no seeded rows; it is hidden by the view and refused by `place_order` / `quote_order`.
 
 | Category | Count | Contents |
 |---|---|---|
