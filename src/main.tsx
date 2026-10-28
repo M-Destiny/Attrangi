@@ -74,6 +74,34 @@ const utils = {
 };
 
 // --- Application State ---
+// Distinct product categories (trimmed, case-insensitive dedupe keeping first-seen spelling, sorted).
+function categoryList(): string[] {
+  const seen = new Map<string, string>();
+  ((state.products || []) as any[]).forEach(p => {
+    const c = String(p.category || '').trim();
+    if (c && !seen.has(c.toLowerCase())) seen.set(c.toLowerCase(), c);
+  });
+  return [...seen.values()].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+function categoryFieldHtml(): string {
+  const cats = categoryList();
+  let cur = String(state.newProduct.category || '').trim();
+  if (!cur && !state.editingProductId && cats.length) cur = state.newProduct.category = cats[0];
+  const inList = cats.some(c => c.toLowerCase() === cur.toLowerCase());
+  if (cur && !inList) cats.push(cur);
+  const sel = cats.find(c => c.toLowerCase() === cur.toLowerCase());
+  const noneYet = !cur && !cats.length;
+  return `
+    <select id="catSelect" class="w-full" onchange="app.handlers.pickCategory(this)">
+      ${!cur && state.editingProductId ? `<option value="" selected>Uncategorized</option>` : ''}
+      ${cats.map(c => `<option value="${esc(c)}" ${c === sel && !noneYet ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+      <option value="__new__" ${noneYet ? 'selected' : ''}>+ Create new category…</option>
+    </select>
+    <input id="newCatInput" type="text" maxlength="40" placeholder="New category name" class="w-full" style="margin-top:0.5rem;display:${noneYet ? 'block' : 'none'}" onchange="app.handlers.newCategoryTyped(this)">`;
+}
+const CAT_COLORS = ['var(--primary)', 'var(--secondary)', 'var(--tertiary)', 'var(--error)', '#8e6bbf', '#2a9d8f', '#e9a23b', '#4f7cac'];
+
 const state: any = {
   currentView: 'dashboard', 
   user: null,
@@ -106,7 +134,7 @@ const state: any = {
     sku: '',
     selling_price: 0,
     stock_level: 0,
-    category: 'Jewelry'
+    category: ''
   },
   currentInvoice: {
     items: [],
@@ -432,11 +460,7 @@ const views: any = {
                 </div>
                 <div class="flex flex-col gap-1 flex-1">
                     <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Category</label>
-                    <select class="w-full" onchange="state.newProduct.category = this.value">
-                      <option value="Jewelry" ${state.newProduct.category === 'Jewelry' ? 'selected' : ''}>Jewelry</option>
-                      <option value="Accessories" ${state.newProduct.category === 'Accessories' ? 'selected' : ''}>Accessories</option>
-                      <option value="Apparel" ${state.newProduct.category === 'Apparel' ? 'selected' : ''}>Apparel</option>
-                    </select>
+                    ${categoryFieldHtml()}
                 </div>
              </div>
           </div>
@@ -781,7 +805,7 @@ const views: any = {
      memberFilteredInvoices.forEach((inv: any) => {
         (inv.items || []).forEach((item: any) => {
            const prod = state.products.find((p: any) => p.id === item.product_id);
-           const cat = prod?.category || 'Jewelry';
+           const cat = prod?.category || 'Uncategorized';
            const val = Number(item.total_price || item.unit_price * item.quantity || 0);
            categoryValue[cat] = (categoryValue[cat] || 0) + val;
            totalVal += val;
@@ -908,8 +932,7 @@ const views: any = {
                    <p class="text-xs font-bold">No product inventory categorized yet</p>
                 </div>
              ` : (dynamicCategorySplit || []).map((cat: any, index: number) => {
-                const colors = ['var(--primary)', 'var(--secondary)', 'var(--tertiary)', 'var(--error)'];
-                const color = colors[index % colors.length];
+                const color = CAT_COLORS[index % CAT_COLORS.length];
                 return `
                    <div class="flex flex-col" style="gap: 0.5rem;">
                       <div class="flex justify-between text-xs font-bold uppercase opacity-60">
@@ -1395,7 +1418,7 @@ const app = {
       // Reset specific view states
       if (view !== 'add-product') {
         state.editingProductId = null;
-        state.newProduct = { name: '', sku: '', selling_price: 0, stock_level: 0, category: 'Jewelry', images: [], show_on_storefront: true };
+        state.newProduct = { name: '', sku: '', selling_price: 0, stock_level: 0, category: '', images: [], show_on_storefront: true };
         state.pendingImageRemovals = [];
       }
 
@@ -1576,7 +1599,7 @@ const app = {
       const categoryValue: any = {};
       let totalVal = 0;
       (prods || []).forEach((p: any) => {
-         const cat = p.category || 'Jewelry';
+         const cat = p.category || 'Uncategorized';
          const val = (p.selling_price || 0) * (p.stock_level || 0);
          categoryValue[cat] = (categoryValue[cat] || 0) + val;
          totalVal += val;
@@ -1590,7 +1613,7 @@ const app = {
       if (totalVal === 0) {
          const categoryCount: any = {};
          (prods || []).forEach((p: any) => {
-            const cat = p.category || 'Jewelry';
+            const cat = p.category || 'Uncategorized';
             categoryCount[cat] = (categoryCount[cat] || 0) + 1;
          });
          const totalCount = (prods || []).length;
@@ -2343,7 +2366,29 @@ const app = {
       app.render();
     },
 
+    pickCategory: (sel: HTMLSelectElement) => {
+      const inp = document.getElementById('newCatInput') as HTMLInputElement;
+      const isNew = sel.value === '__new__';
+      inp.style.display = isNew ? 'block' : 'none';
+      if (isNew) { inp.value = ''; state.newProduct.category = ''; inp.focus(); }
+      else state.newProduct.category = sel.value;
+    },
+    newCategoryTyped: (inp: HTMLInputElement) => {
+      const v = inp.value.trim().slice(0, 40);
+      const existing = categoryList().find(c => c.toLowerCase() === v.toLowerCase());
+      if (v && existing) {
+        // duplicate: switch to the existing category
+        const sel = document.getElementById('catSelect') as HTMLSelectElement;
+        sel.value = existing; inp.style.display = 'none'; state.newProduct.category = existing;
+      } else state.newProduct.category = v;
+    },
     handleSaveProduct: async () => {
+      const newCat = document.getElementById('newCatInput') as HTMLInputElement | null;
+      if (newCat && newCat.style.display !== 'none') app.handlers.newCategoryTyped(newCat);
+      if (!String(state.newProduct.category || '').trim() && !state.editingProductId) {
+        alert('Please choose or create a category.');
+        return;
+      }
       const btn = event?.target as HTMLButtonElement;
       if (btn) btn.disabled = true;
 
