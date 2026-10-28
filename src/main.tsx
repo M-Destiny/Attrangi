@@ -107,6 +107,7 @@ function amountInWords(n: number): string {
 }
 
 function buildInvoiceHtml(inv: any, logoSrc: string): string {
+  const fmtDmy = (v: any) => { const d = new Date(v); return isNaN(d.getTime()) ? String(v ?? '') : d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }); };
   const money = (v: any) => '₹' + (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   const items: any[] = inv.items || [];
   const { subtotal, taxAmount, total: calcTotal } = utils.calculateInvoiceTotals({ ...inv, items });
@@ -154,7 +155,7 @@ function buildInvoiceHtml(inv: any, logoSrc: string): string {
 .inv .foot{margin-top:46px;text-align:center;page-break-inside:avoid;break-inside:avoid}
 .inv .thanks{font-family:'Epilogue','Plus Jakarta Sans',Arial,sans-serif;font-size:15px;font-weight:700;color:#E87AAE}
 .inv .sub{font-size:10.5px;color:#999;margin-top:5px}
-.inv .bar{display:flex;height:6px;margin-top:auto}.inv .bar i{flex:1}
+.inv .stripe{display:flex;flex:none;height:6px;margin-top:auto}.inv .stripe i{flex:1;display:block;height:6px}
 </style>
 <div class="inv">
   <div class="band">
@@ -165,7 +166,7 @@ function buildInvoiceHtml(inv: any, logoSrc: string): string {
     <div class="title">
       <div><h1>INVOICE</h1><div class="num">${esc(inv.id)}</div></div>
       <div style="text-align:right">
-        ${meta('Issue date', esc(inv.date))}${inv.due_date ? meta('Due date', esc(inv.due_date)) : ''}
+        ${meta('Issue date', esc(fmtDmy(inv.date)))}${inv.due_date ? meta('Due date', esc(fmtDmy(inv.due_date))) : ''}
         <span class="pill" style="background:${pBg};color:${pFg}">${pLabel}</span>
         ${status === 'paid' && inv.paid_to ? `<div class="recv">Received by <b>${esc(inv.paid_to)}</b></div>` : ''}
       </div>
@@ -194,7 +195,7 @@ function buildInvoiceHtml(inv: any, logoSrc: string): string {
       <div class="sub">Made with ❤️ by Destiny</div>
     </div>
   </div>
-  <div class="bar"><i style="background:#E87AAE"></i><i style="background:#F4D21F"></i><i style="background:#5FA8C9"></i></div>
+  <div class="stripe"><i style="background:#E87AAE"></i><i style="background:#F4D21F"></i><i style="background:#5FA8C9"></i></div>
 </div>`;
 }
 
@@ -2329,7 +2330,7 @@ const app = {
       } catch { /* fall back to the plain URL */ }
 
       const element = document.createElement('div');
-      element.className = 'printable-invoice';
+      element.style.cssText = 'width:794px;margin:0;padding:0;background:#fff;';
       element.innerHTML = buildInvoiceHtml(inv, logoSrc);
 
       const opt: any = {
