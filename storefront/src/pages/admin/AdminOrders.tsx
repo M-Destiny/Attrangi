@@ -12,7 +12,7 @@ const STATUSES = ['unpaid', 'paid', 'partially_paid', 'overdue', 'cancelled'];
 const label = (s: string) => s.replace('_', ' ');
 const tone: Record<string, string> = {
   unpaid: 'bg-amber-100 text-amber-800', paid: 'bg-green-100 text-green-800',
-  partially_paid: 'bg-sky-100 text-sky-800', overdue: 'bg-red-100 text-red-800', cancelled: 'bg-gray-200 text-gray-700',
+  partially_paid: 'bg-sky-100 text-sky-800', overdue: 'bg-red-100 text-red-800', cancelled: 'bg-gray-200 text-ink',
 };
 const Badge = ({ s }: { s: string }) => (
   <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${tone[s] ?? 'bg-gray-100'}`}>{PAYMENT_LABEL[s] ?? label(s)}</span>
@@ -194,7 +194,7 @@ function Detail({ order, onClose, onChanged }: { order: AdminOrder; onClose: () 
           )}
           {isCancelled && (
             <div className="rounded-lg bg-gray-100 p-3 space-y-2">
-              <p className="text-sm text-gray-800">This order is cancelled and its stock was returned.</p>
+              <p className="text-sm text-ink">This order is cancelled and its stock was returned.</p>
               <button onClick={() => save('unpaid')} disabled={saving} className="w-full rounded-lg border border-line bg-white py-2 text-sm font-semibold hover:bg-soft disabled:opacity-60">{saving ? 'Reopening…' : 'Reopen order (re-reserves stock)'}</button>
             </div>
           )}
