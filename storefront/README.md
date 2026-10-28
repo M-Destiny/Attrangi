@@ -161,6 +161,16 @@ Pricing rules live in SQL (`shipping-coupons.sql`): shipping Rs 80, free when su
 4. `vercel.json` rewrites every path to `/` so deep links (`/product/...`, `/admin`) work on refresh.
 5. In Supabase Auth settings, add the deployed URL to the Site URL / redirect URLs so confirmation emails return correctly.
 
+## Email notifications
+
+Sent via Resend from `api/notify.ts` (Vercel serverless; recipients and content always come from the database, never the browser):
+- New order: alert to `OWNER_EMAIL`, plus a confirmation to the customer if they gave an email (sent once per order).
+- Staff change payment/shipping/tracking in `/admin`: status email to the customer (tick "Email customer about this update"; needs an email on the order).
+
+Setup: run `supabase/notifications.sql` in the Supabase SQL editor (after `shipping-coupons.sql`). In Vercel add `RESEND_API_KEY`, `OWNER_EMAIL`, optional `FROM_EMAIL` (default `Attrangii <onboarding@resend.dev>`) and `SITE_URL`; `VITE_SUPABASE_*` are reused. If keys are missing the API returns "email not configured" and the shop works as before.
+
+Resend note: with the default `onboarding@resend.dev` sender, Resend only delivers to your own Resend account address. To email customers, verify a domain in Resend and set `FROM_EMAIL` to an address on it.
+
 ## Troubleshooting
 
 - **Shop is empty / "couldn't load products"**: `storefront.sql` has not been run (no `storefront_products` view), or there are no products (run `seed-products.sql`). Check the network tab for a 404/permission error on `storefront_products`.

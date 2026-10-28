@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth';
 import { adminOrders, adminSetStatus, adminUpdateFulfilment } from '../../lib/api';
 import { SHIPPING_LABEL, SHIPPING_STEPS, PAYMENT_LABEL, PAYMENT_METHODS } from '../../lib/orderStatus';
 import { inr } from '../../lib/format';
+import { notifyStatus } from '../../lib/notify';
 import type { AdminOrder, ShippingStatus } from '../../lib/types';
 
 const STATUSES = ['unpaid', 'paid', 'partially_paid', 'overdue', 'cancelled'];
@@ -164,7 +165,7 @@ function Detail({ order, onClose, onChanged }: { order: AdminOrder; onClose: () 
 
   async function save(status = next) {
     setSaving(true); setErr('');
-    try { await adminSetStatus(order.invoice_number, status); await onChanged(); }
+    try { await adminSetStatus(order.invoice_number, status); if (c?.email) notifyStatus(order.invoice_number); await onChanged(); }
     catch (e) { setErr(e instanceof Error ? e.message : 'Update failed'); }
     finally { setSaving(false); }
   }
@@ -256,6 +257,8 @@ function Fulfilment({ order, onChanged }: { order: AdminOrder; onChanged: () => 
   });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const hasEmail = !!order.customer?.email;
+  const [emailIt, setEmailIt] = useState(true);
   const locked = order.status === 'cancelled';
   const set = (k: keyof typeof f, v: string) => { setF(p => ({ ...p, [k]: v })); setMsg(null); };
   const safeUrl = HTTP.test(order.tracking_url ?? '') ? order.tracking_url : null;
@@ -268,6 +271,7 @@ function Fulfilment({ order, onChanged }: { order: AdminOrder; onChanged: () => 
       await adminUpdateFulfilment(order.invoice_number, {
         ...f, courier: f.courier.trim(), tracking_number: f.tracking_number.trim(), tracking_url: url, payment_reference: f.payment_reference.trim(),
       });
+      if (hasEmail && emailIt) notifyStatus(order.invoice_number);
       await onChanged();
       setMsg({ ok: true, t: 'Saved.' });
     } catch (e) { setMsg({ ok: false, t: e instanceof Error ? e.message : 'Update failed' }); }
@@ -314,6 +318,10 @@ function Fulfilment({ order, onChanged }: { order: AdminOrder; onChanged: () => 
         <div><label htmlFor="pref" className="text-sm block mb-1">Payment reference</label>
           <input id="pref" value={f.payment_reference} onChange={e => set('payment_reference', e.target.value)} disabled={saving} className={field} /></div>
       </div>
+      <label className={`flex items-center gap-2 text-sm ${hasEmail ? '' : 'text-muted'}`}>
+        <input type="checkbox" checked={hasEmail && emailIt} disabled={!hasEmail || saving} onChange={e => setEmailIt(e.target.checked)} />
+        Email customer about this update{hasEmail ? '' : ' (no email on file)'}
+      </label>
       {msg && <p role={msg.ok ? 'status' : 'alert'} className={`text-sm ${msg.ok ? 'text-green-700' : 'text-red-700'}`}>{msg.t}</p>}
       <button type="submit" disabled={saving} className="w-full rounded-lg py-2.5 text-sm font-semibold text-white bg-brand hover:bg-brand-dark disabled:opacity-60">
         {saving ? 'Saving…' : 'Save shipping & payment'}

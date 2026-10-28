@@ -6,6 +6,7 @@ import { Minus, Plus, Trash2 } from 'lucide-react';
 import { useCart } from '../lib/cart';
 import { getMyAccount, placeOrder, quoteOrder } from '../lib/api';
 import { inr } from '../lib/format';
+import { notifyNewOrder } from '../lib/notify';
 
 const field = 'mt-1 w-full rounded-lg border border-line px-3 py-2.5 text-base focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30 aria-[invalid=true]:border-red-500';
 const cleanPhone = (p: string) => p.replace(/[\s-]/g, '').replace(/^(\+91|0)/, '');
@@ -63,6 +64,7 @@ export default function Checkout() {
     setBusy(true);
     try {
       const r = await placeOrder({ name: f.name.trim(), phone, email: f.email.trim(), address: f.address.trim() }, lines, q?.coupon_code ?? undefined);
+      notifyNewOrder(r.invoice_number, phone);
       clear();
       nav(`/order/${r.invoice_number}`, { state: { ...r, phone } });
     } catch (err) {
