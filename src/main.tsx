@@ -137,8 +137,8 @@ function buildInvoiceHtml(inv: any, logoSrc: string): string {
 .inv .meta{display:flex;justify-content:flex-end;gap:10px;font-size:12px;color:#777;margin-bottom:3px}.inv .meta b{color:#222;min-width:90px;text-align:right}
 .inv .pill{display:inline-block;padding:4px 16px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:1px;margin-top:6px}
 .inv .recv{font-size:11.5px;color:#777;margin-top:4px}
-.inv .bill{margin-top:22px;border:1px solid #F3D3E3;border-left:5px solid #F4D21F;border-radius:10px;padding:14px 18px;width:55%;background:#fff;page-break-inside:avoid}
-.inv .lbl{font-size:10px;font-weight:800;letter-spacing:1.5px;color:#5FA8C9;text-transform:uppercase;margin-bottom:6px}
+.inv .bill{margin-top:22px;border:1px solid #F3D3E3;border-radius:10px;padding:14px 18px;width:55%;background:#fff;page-break-inside:avoid}
+.inv .lbl{display:inline-block;font-size:10px;font-weight:800;letter-spacing:1.5px;color:#5FA8C9;text-transform:uppercase;margin-bottom:8px;padding-bottom:3px;border-bottom:2px solid #F4D21F}
 .inv .cname{font-family:'Epilogue','Plus Jakarta Sans',Arial,sans-serif;font-size:17px;font-weight:700}.inv .line{font-size:12px;color:#555;margin-top:2px}
 .inv table{width:100%;border-collapse:collapse;margin-top:24px}
 .inv thead{display:table-header-group}
