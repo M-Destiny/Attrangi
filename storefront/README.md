@@ -9,6 +9,7 @@ Design documentation: [`../docs/DESIGN.md`](../docs/DESIGN.md).
 - Catalog: home (categories + new arrivals), shop with search, category chips, in-stock filter and sort, product page with gallery and full-screen lightbox, related products.
 - Cart: slide-in drawer, persisted in `localStorage`, quantities clamped to stock, free-shipping nudge.
 - Checkout: guest or signed-in, server-priced totals (`quote_order`), coupon codes, Indian mobile validation, order placed via the `place_order` RPC.
+- Catalogue page: the owner's product catalogue (PDF) shown as phone-friendly pages with zoom and a download link. To replace it, re-render the pages to `public/catalogue/` (900px JPEGs named `page-01.jpg` …) and update `PAGES` in `src/pages/Catalog.tsx`.
 - Order tracking: by invoice number + phone (public) or from "My account" (signed in). Shipping timeline, courier/tracking link, payment status.
 - Accounts: email/password sign-up and sign-in (Supabase Auth), profile prefill at checkout, order history.
 - Admin (staff only): orders list with filters, order detail panel (shipping and payment form, cancel/reopen with stock restore), coupon manager.
@@ -104,6 +105,7 @@ storefront/
 | `/product/:id` | ProductPage | Public |
 | `/checkout` | Checkout | Public (guest allowed; signed-in prefills) |
 | `/order/:invoice` | OrderSuccess | Public |
+| `/catalog` | Catalog (`?page=N`) | Public. 89-page product catalogue: scrollable pages from `public/catalogue/page-NN.jpg`, jump-to-page, tap-to-zoom viewer with swipe, PDF download (`public/attrangii-products-catalogue.pdf`) |
 | `/track` | TrackOrder (`?invoice=`) | Public (needs invoice + phone) |
 | `/login` | Login (`?next=`) | Public; redirects away if already signed in |
 | `/account` | Account | Signed-in; otherwise redirect to `/login?next=/account` |

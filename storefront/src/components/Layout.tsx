@@ -6,7 +6,7 @@ import { useAuth } from '../lib/auth';
 import CartDrawer from './CartDrawer';
 
 const ring = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand';
-const links = [{ to: '/shop', label: 'Shop' }, { to: '/track', label: 'Track Order' }];
+const links = [{ to: '/shop', label: 'Shop' }, { to: '/catalog', label: 'Catalog' }, { to: '/track', label: 'Track Order' }];
 const navCls = ({ isActive }: { isActive: boolean }) => `rounded px-1 py-1 font-semibold hover:text-brand-dark ${ring} ${isActive ? 'text-brand-dark' : ''}`;
 
 export default function Layout() {
