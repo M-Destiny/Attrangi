@@ -12,6 +12,8 @@ export type Cust = { name: string; email: string | null; phone: string; address:
 type Mail = { subject: string; html: string; text: string };
 
 const env = (k: string, d = '') => process.env[k] || d;
+/** Free text (name/address) comes from an anonymous checkout form, so it is untrusted: strip control chars and links, collapse whitespace, cap length. */
+export const clean = (v: unknown, max: number) => String(v ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/(https?:\/\/|www\.)\S+/gi, '[link removed]').replace(/\s+/g, ' ').trim().slice(0, max);
 const SITE = () => env('SITE_URL', 'https://attrangii-store.vercel.app').replace(/\/+$/, '');
 export const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const inr = (n: number) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -102,9 +104,11 @@ export default async function handler(req: Req, res: Res) {
       const r = await rpc('claim_order_notification', { p_invoice_number: inv, p_phone: phone });
       if (!r.ok) return res.status(502).json({ ok: false, error: 'failed' });
       if (!r.data) return res.status(200).json({ ok: true, skipped: true });
-      const { order, customer } = r.data as { order: Order; customer: Cust };
-      const sent = [await send(env('OWNER_EMAIL'), ownerMail(order, customer))];
-      if (customer.email && EMAIL.test(customer.email)) sent.push(await send(customer.email, confirmMail(order, customer)));
+      const { order, customer, recent_for_email } = r.data as { order: Order; customer: Cust; recent_for_email?: number };
+      const sent = [await send(env('OWNER_EMAIL'), ownerMail(order, { ...customer, name: clean(customer.name, 120), address: clean(customer.address, 400) }))];
+      // Anyone can type any email at checkout, so cap confirmations per recipient (anti-spam) and only send sanitised text.
+      if (customer.email && EMAIL.test(customer.email) && (recent_for_email ?? 0) <= 3)
+        sent.push(await send(customer.email, confirmMail(order, { ...customer, name: clean(customer.name, 60), address: clean(customer.address, 200) })));
       return res.status(200).json({ ok: true, sent: sent.filter(Boolean).length });
     }
     if (b.type === 'status') {
@@ -116,7 +120,7 @@ export default async function handler(req: Req, res: Res) {
       const o = (r.data as (Order & { customer: Cust })[]).find(x => x.invoice_number === inv);
       if (!o) return res.status(404).json({ ok: false, error: 'not found' });
       if (!o.customer?.email || !EMAIL.test(o.customer.email)) return res.status(200).json({ ok: true, skipped: true });
-      return res.status(200).json({ ok: true, sent: (await send(o.customer.email, statusMail(o, o.customer))) ? 1 : 0 });
+      return res.status(200).json({ ok: true, sent: (await send(o.customer.email, statusMail(o, { ...o.customer, name: clean(o.customer.name, 60), address: clean(o.customer.address, 200) }))) ? 1 : 0 });
     }
     return res.status(400).json({ ok: false, error: 'bad request' });
   } catch {

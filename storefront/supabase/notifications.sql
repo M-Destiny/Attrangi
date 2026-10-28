@@ -5,7 +5,7 @@ alter table public.invoices add column if not exists notified_at timestamptz;
 -- (wrong phone, not a web order, or already notified) so a replay can never send twice.
 create or replace function public.claim_order_notification(p_invoice_number text, p_phone text)
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
-declare v_id uuid; r invoices; c customers;
+declare v_id uuid; r invoices; c customers; v_recent int := 0;
 begin
   update invoices i set notified_at = now()
    from customers cu
@@ -15,7 +15,11 @@ begin
   if v_id is null then return null; end if;
   select * into r from invoices where id = v_id;
   select * into c from customers where id = r.customer_id;
-  return jsonb_build_object('order', public._order_public(r),
+  if c.email is not null then  -- per-recipient throttle input: orders notified to this address in the last hour (includes this one)
+    select count(*) into v_recent from invoices i2 join customers c2 on c2.id = i2.customer_id
+     where lower(c2.email) = lower(c.email) and i2.notified_at > now() - interval '1 hour';
+  end if;
+  return jsonb_build_object('order', public._order_public(r), 'recent_for_email', v_recent,
     'customer', jsonb_build_object('name', c.name, 'email', c.email, 'phone', c.phone, 'address', c.address));
 end $$;
 revoke execute on function public.claim_order_notification(text,text) from public;
