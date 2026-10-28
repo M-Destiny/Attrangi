@@ -94,3 +94,31 @@ from (values
 ) as v(name, sku, price, pieces, files),
 (select 'https://fugbfrbychvdynnqbcji.supabase.co/storage/v1/object/public/product-images/'::text as base) b
 on conflict (sku) do nothing;
+
+-- Hidden from the public store (kept in the CRM inventory). Requires the show_on_storefront column from storefront.sql.
+update public.products set show_on_storefront = false where sku in (
+  'BRICKS-F3022-RED-MASKED-HERO',
+  'BRICKS-H-18-BLONDE-GIRL',
+  'BUZZ-TOY-STORY',
+  'MES-SPIDERMAN-TENTACLES',
+  'ZD-DEADPOOL',
+  'ZD-WOLVERINE',
+  'ZD-MARK85-IRONMAN',
+  'SPIDERMAN-ON-STONE',
+  'SPIDERMAN-MASK-JAW',
+  'MARIO',
+  'VALORANT-JET',
+  'GENSHIN-IMPACT',
+  'GTA',
+  'HALO',
+  'GOW-GHOST-OF-SPARTA',
+  'GOW-STATUE',
+  'MARVEL-INFINITY',
+  'F1-BLOCKS',
+  'POKEBALL-SQUIRTLE',
+  'TERMINATOR',
+  'PREDATOR'
+);
+
+-- Actual Pokeball stock: only Meowth is in stock; the other designs are sold out.
+update public.products set stock_level = 0 where sku in ('POKEBALL-SQUIRTLE','POKEBALL-PIKACHU','POKEBALL-EEVEE','POKEBALL-BULBASAUR','POKEBALL-CHARMANDER');

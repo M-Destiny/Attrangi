@@ -4,10 +4,11 @@
 
 -- 1. Safe public catalog view (hides buying_price, supplier_id, serial_number).
 alter table public.products add column if not exists images text[] not null default '{}';  -- gallery; image_url stays the main image
+alter table public.products add column if not exists show_on_storefront boolean not null default true;  -- false = hidden from the public site only (stays in the CRM)
 create or replace view public.storefront_products as
   select id, name, sku, category, brand, selling_price, stock_level, image_url, created_at, images
   from public.products
-  where lower(coalesce(category,'')) not in ('pins','pin');  -- Pins are not sold on the storefront
+  where show_on_storefront and lower(coalesce(category,'')) not in ('pins','pin');  -- hidden + Pins are not sold on the storefront
 revoke all on public.storefront_products from anon, authenticated;  -- view is auto-updatable & bypasses RLS: allow SELECT only
 grant select on public.storefront_products to anon, authenticated;
 

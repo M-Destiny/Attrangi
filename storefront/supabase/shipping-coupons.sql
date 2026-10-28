@@ -81,7 +81,7 @@ begin
   end if;
   select coalesce(sum(p.selling_price * least(greatest(coalesce((e->>'qty')::int, 1), 1), 10)), 0) into v_sub
     from jsonb_array_elements(p_items) e join products p on p.id = (e->>'product_id')::uuid
-   where lower(coalesce(p.category,'')) not in ('pins','pin');
+   where p.show_on_storefront and lower(coalesce(p.category,'')) not in ('pins','pin');
   v_cd := public._coupon_discount(p_code, v_sub, null, auth.uid(), false);  -- phone not used here: stops probing whether a phone used a code; place_order enforces it
   v_disc := (v_cd->>'discount')::numeric;
   v_ship := public._shipping_fee(v_sub - v_disc);
@@ -131,7 +131,7 @@ begin
     v_qty := greatest(coalesce((v_item->>'qty')::int, 1), 1);
     if v_qty > 10 then raise exception 'Max 10 per item'; end if;
     select * into v_prod from products where id = (v_item->>'product_id')::uuid for update;
-    if not found or v_prod.selling_price is null or lower(coalesce(v_prod.category,'')) in ('pins','pin') then
+    if not found or v_prod.selling_price is null or not v_prod.show_on_storefront or lower(coalesce(v_prod.category,'')) in ('pins','pin') then
       raise exception 'Product not found';
     end if;
     if coalesce(v_prod.stock_level,0) < v_qty then raise exception 'Only % left of %', coalesce(v_prod.stock_level,0), v_prod.name; end if;

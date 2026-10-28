@@ -50,7 +50,7 @@ const utils = {
   calculateInvoiceTotals: (inv: any) => {
     const subtotal = inv.items.reduce((acc: any, item: any) => acc + (item.qty * (item.price || 0)), 0);
     const taxAmount = (subtotal - (inv.discount || 0)) * ((inv.taxRate || 0) / 100);
-    const total = subtotal - (inv.discount || 0) + taxAmount;
+    const total = subtotal - (inv.discount || 0) + taxAmount + (inv.shipping || 0);
     return { subtotal, taxAmount, total };
   },
   updateInvoiceSummaryUI: () => {
@@ -101,6 +101,7 @@ const state: any = {
   pendingImageRemovals: [] as string[],
   newProduct: {
     images: [] as string[],
+    show_on_storefront: true,
     name: '',
     sku: '',
     selling_price: 0,
@@ -395,7 +396,7 @@ const views: any = {
                      <div class="rounded-lg bg-surface-container-highest overflow-hidden" style="width:44px;height:44px;min-width:44px;flex:none">
                         ${(p.image_url || (p.images ?? [])[0]) ? `<img src="${p.image_url || (p.images ?? [])[0]}" style="width:44px;height:44px;min-width:44px;max-width:44px;object-fit:cover;border-radius:8px;flex:none;display:block;background:#eee" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'">` : `<div class="w-full h-full flex items-center justify-center opacity-40">${ICONS.inventory}</div>`}
                      </div>
-                     ${p.name}</div>
+                     ${p.name}${p.show_on_storefront === false ? ' <span style="font-size:.65rem;font-weight:600;padding:.1rem .5rem;border-radius:999px;background:#e5e7eb;color:#4b5563;white-space:nowrap">Hidden on website</span>' : ''}</div>
                   </td>
                   <td class="font-mono text-xs">${p.sku}</td>
                   <td><span class="text-xs px-2 py-1 rounded-full" style="background: var(--surface-container-highest)">${p.category}</span></td>
@@ -479,6 +480,10 @@ const views: any = {
                  <label class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Initial Stock</label>
                  <input type="number" class="w-full" value="${state.newProduct.stock_level}" oninput="state.newProduct.stock_level = parseInt(this.value) || 0">
               </div>
+              <label style="display:flex;align-items:flex-start;gap:.5rem;cursor:pointer">
+                 <input type="checkbox" style="margin-top:.2rem" ${state.newProduct.show_on_storefront !== false ? 'checked' : ''} onchange="state.newProduct.show_on_storefront = this.checked">
+                 <span><span class="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Show on website</span><br><span class="text-xs text-on-surface-variant">Untick to hide this product from the public store; it stays in inventory.</span></span>
+              </label>
            </div>
         </div>
         <button class="btn btn-primary w-full py-4 text-sm" onclick="app.handlers.handleSaveProduct()">Save Specifications</button>
@@ -625,8 +630,12 @@ const views: any = {
                <div class="space-y-4">
                   <div class="flex justify-between">
                      <span class="text-on-surface-variant">Subtotal</span>
-                     <span class="font-bold">₹${inv.amount.toLocaleString('en-IN')}</span>
+                     <span class="font-bold">₹${(inv.amount - (inv.shipping || 0)).toLocaleString('en-IN')}</span>
                   </div>
+                  ${inv.shipping > 0 ? `<div class="flex justify-between">
+                     <span class="text-on-surface-variant">Shipping</span>
+                     <span class="font-bold">₹${inv.shipping.toLocaleString('en-IN')}</span>
+                  </div>` : ''}
                   <div class="flex justify-between">
                      <span class="text-on-surface-variant">Tax</span>
                      <span class="font-bold">₹0</span>
@@ -1169,6 +1178,16 @@ const views: any = {
                     <span class="text-xs opacity-40 font-bold">%</span>
                  </div>
               </div>
+              <div class="flex justify-between items-center group">
+                 <div class="flex flex-col">
+                    <span class="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Shipping charges (₹)</span>
+                    <span class="text-[9px] font-bold text-on-surface-variant">Not taxed</span>
+                 </div>
+                 <div class="flex items-center gap-2 bg-surface-container-highest/40 rounded-xl px-3 py-1">
+                    <span class="text-xs opacity-40 font-bold">₹</span>
+                    <input type="number" min="0" step="1" value="${inv.shipping || 0}" style="width: 6rem; text-align: right; border: none; font-weight: 900; background: transparent; padding: 0.5rem 0;" oninput="app.handlers.handleUpdateInvoiceHeader('shipping', parseFloat(this.value) || 0, true)">
+                 </div>
+              </div>
               <div class="pt-8 border-t border-outline-variant flex justify-between items-end">
                  <span class="font-black text-secondary text-2xl uppercase tracking-tighter">Net Total</span>
                  <span class="font-black text-4xl" id="summary-total">₹${total.toLocaleString('en-IN')}</span>
@@ -1376,7 +1395,7 @@ const app = {
       // Reset specific view states
       if (view !== 'add-product') {
         state.editingProductId = null;
-        state.newProduct = { name: '', sku: '', selling_price: 0, stock_level: 0, category: 'Jewelry', images: [] };
+        state.newProduct = { name: '', sku: '', selling_price: 0, stock_level: 0, category: 'Jewelry', images: [], show_on_storefront: true };
         state.pendingImageRemovals = [];
       }
 
@@ -1449,7 +1468,8 @@ const app = {
           selling_price: prod.selling_price,
           stock_level: prod.stock_level,
           category: prod.category,
-          images: (prod.images && prod.images.length ? prod.images : (prod.image_url ? [prod.image_url] : []))
+          images: (prod.images && prod.images.length ? prod.images : (prod.image_url ? [prod.image_url] : [])),
+          show_on_storefront: prod.show_on_storefront !== false
         };
       }
       state.editingProductId = id;
@@ -1483,6 +1503,7 @@ const app = {
          customer_id: i.customer_id,
          discount: i.discount_amount || 0,
          taxRate: i.tax_rate || 0,
+         shipping: Number(i.shipping_fee) || 0,
          date: new Date(i.issue_date).toLocaleDateString(),
          raw_date: i.issue_date,
          amount: i.total_amount,
@@ -1637,6 +1658,7 @@ const app = {
         items: [],
         discount: 0,
         taxRate: 0,
+        shipping: 0,
       };
       state.editingInvoiceDbId = null;
       state.editingInvoiceNumber = null;
@@ -1653,6 +1675,7 @@ const app = {
         new_customer_name: '',
         discount: inv.discount || 0,
         taxRate: inv.taxRate || 0,
+        shipping: inv.shipping || 0,
         items: inv.items.map((item: any) => ({
           id: item.id || Date.now() + Math.random(),
           description: item.description,
@@ -1877,7 +1900,14 @@ const app = {
 
         const subtotal = state.currentInvoice.items.reduce((acc: any, item: any) => acc + (item.qty * item.price), 0);
         const taxAmount = (subtotal - state.currentInvoice.discount) * (state.currentInvoice.taxRate / 100);
-        const total = subtotal - state.currentInvoice.discount + taxAmount;
+        const shipping = Number(state.currentInvoice.shipping) || 0;
+        const total = subtotal - state.currentInvoice.discount + taxAmount + shipping;
+        // Retry once without shipping_fee if the column is missing
+        const withShipFallback = async (run: (extra: any) => PromiseLike<any>) => {
+          let res = await run({ shipping_fee: shipping });
+          if (res.error && /shipping_fee/i.test(res.error.message || '')) res = await run({});
+          return res;
+        };
 
         if (state.editingInvoiceDbId) {
           // UPDATE MODE
@@ -1898,7 +1928,7 @@ const app = {
           }
 
           // 2. Update invoice header
-          const { error: invErr } = await supabase
+          const { error: invErr } = await withShipFallback((extra) => supabase
             .from('invoices')
             .update({
               customer_id: customerId,
@@ -1906,9 +1936,10 @@ const app = {
               tax_rate: state.currentInvoice.taxRate,
               tax_amount: taxAmount,
               discount_amount: state.currentInvoice.discount,
-              total_amount: total
+              total_amount: total,
+              ...extra
             })
-            .eq('id', state.editingInvoiceDbId);
+            .eq('id', state.editingInvoiceDbId));
 
           if (invErr) throw invErr;
 
@@ -1946,20 +1977,22 @@ const app = {
 
         } else {
           // CREATE MODE
-          const { data: invoice, error: invErr } = await supabase
+          const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+          const { data: invoice, error: invErr } = await withShipFallback((extra) => supabase
             .from('invoices')
             .insert([{
-              invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+              invoice_number: invoiceNumber,
               customer_id: customerId,
               subtotal,
               tax_rate: state.currentInvoice.taxRate,
               tax_amount: taxAmount,
               discount_amount: state.currentInvoice.discount,
               total_amount: total,
-              status: 'unpaid'
+              status: 'unpaid',
+              ...extra
             }])
             .select()
-            .single();
+            .single());
 
           if (invErr) throw invErr;
 
@@ -1997,6 +2030,7 @@ const app = {
           items: [],
           discount: 0,
           taxRate: 0,
+          shipping: 0,
         };
         state.editingInvoiceDbId = null;
         state.editingInvoiceNumber = null;
@@ -2205,8 +2239,12 @@ const app = {
             <div style="width: 22rem;">
               <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; padding: 0 1rem;">
                  <p style="color: #666; font-size: 0.9rem;">Subtotal</p>
-                 <p style="font-weight: 800; font-size: 0.9rem;">₹${inv.amount.toLocaleString('en-IN')}</p>
+                 <p style="font-weight: 800; font-size: 0.9rem;">₹${(inv.amount - (inv.shipping || 0)).toLocaleString('en-IN')}</p>
               </div>
+              ${inv.shipping > 0 ? `<div style="display: flex; justify-content: space-between; margin-bottom: 1rem; padding: 0 1rem;">
+                 <p style="color: #666; font-size: 0.9rem;">Shipping</p>
+                 <p style="font-weight: 800; font-size: 0.9rem;">₹${inv.shipping.toLocaleString('en-IN')}</p>
+              </div>` : ''}
               <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem; padding: 0 1rem;">
                  <p style="color: #666; font-size: 0.9rem;">Tax / GST</p>
                  <p style="font-weight: 800; font-size: 0.9rem;">₹0.00</p>
@@ -2320,9 +2358,15 @@ const app = {
           category: state.newProduct.category,
           brand: 'Attrangii Premium',
           image_url: imgs[0] ?? null,
-          images: imgs
+          images: imgs,
+          show_on_storefront: state.newProduct.show_on_storefront !== false
         };
         let { error } = await supabase.from('products').upsert([row]);
+        if (error && /show_on_storefront/i.test(error.message || '')) {
+          // column missing (migration not run): retry without it
+          delete row.show_on_storefront;
+          ({ error } = await supabase.from('products').upsert([row]));
+        }
         if (error && /images/i.test(error.message || '')) {
           // `images` column missing (migration not run): retry without it
           delete row.images;
