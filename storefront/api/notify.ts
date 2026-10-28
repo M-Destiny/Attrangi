@@ -51,25 +51,25 @@ export function ownerMail(o: Order, c: Cust): Mail {
   const text = `New order ${o.invoice_number}\n${c.name}\n${c.phone}\n${c.email ?? ''}\n${c.address}\n\n${itemsText(o)}\n\nAdmin: ${link}`;
   return { subject: `New order ${o.invoice_number} - ${inr(o.total)}`, html, text };
 }
-export function confirmMail(o: Order, c: Cust): Mail {
+export function confirmMail(o: Order, _c: Cust): Mail {
+  // Sent to an address typed into an anonymous form, so it carries NO customer-typed text (no name/address): only our own order data.
   const link = trackUrl(o.invoice_number);
-  const html = shell(`Thank you, ${c.name}!`,
-    p(`We have received your order <b>${esc(o.invoice_number)}</b>. We will update you as it ships.`) + itemsHtml(o)
-    + p(`<br>Delivering to:<br>${esc(c.address)}`), { href: link, text: 'Track your order' });
-  const text = `Thank you, ${c.name}! We received your order ${o.invoice_number}.\n\n${itemsText(o)}\n\nDelivering to: ${c.address}\nTrack: ${link}`;
+  const html = shell('Thank you for your order!',
+    p(`We have received your order <b>${esc(o.invoice_number)}</b>. We will update you as it ships.`) + itemsHtml(o), { href: link, text: 'Track your order' });
+  const text = `Thank you for your order! We received order ${o.invoice_number}.\n\n${itemsText(o)}\n\nTrack: ${link}`;
   return { subject: `Order confirmed: ${o.invoice_number}`, html, text };
 }
-export function statusMail(o: Order, c: Cust): Mail {
+export function statusMail(o: Order, _c: Cust): Mail {
   const link = trackUrl(o.invoice_number);
   const cancelled = o.status === 'cancelled';
   const tu = safeHttp(o.tracking_url);
   const lines = cancelled ? [] : [['Payment', label(o.status)], ['Shipping', label(o.shipping_status)],
     ...(o.courier ? [['Courier', o.courier]] : []), ...(o.tracking_number ? [['Tracking number', o.tracking_number]] : [])];
   const html = shell(cancelled ? `Order ${o.invoice_number} was cancelled` : `Update on order ${o.invoice_number}`,
-    p(`Hi ${esc(c.name)},`) + (cancelled ? p('Your order has been cancelled. If you did not expect this, please contact us.')
+    p('Hello,') + (cancelled ? p('Your order has been cancelled. If you did not expect this, please contact us.')
       : `<table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin-bottom:12px">${lines.map(([a, b]) => row(esc(a), esc(b))).join('')}</table>`
         + (tu ? p(`<a href="${esc(tu)}" style="color:#5FA8C9">Courier tracking page</a>`) : '')), { href: link, text: 'Track your order' });
-  const text = `Hi ${c.name},\n${cancelled ? `Your order ${o.invoice_number} was cancelled.` : `Update on order ${o.invoice_number}:\n` + lines.map(l => `${l[0]}: ${l[1]}`).join('\n') + (tu ? `\nCourier tracking: ${tu}` : '')}\n\nTrack: ${link}`;
+  const text = `Hello,\n${cancelled ? `Your order ${o.invoice_number} was cancelled.` : `Update on order ${o.invoice_number}:\n` + lines.map(l => `${l[0]}: ${l[1]}`).join('\n') + (tu ? `\nCourier tracking: ${tu}` : '')}\n\nTrack: ${link}`;
   return { subject: cancelled ? `Order ${o.invoice_number} cancelled` : `Order ${o.invoice_number}: ${label(o.shipping_status)}`, html, text };
 }
 
@@ -104,11 +104,11 @@ export default async function handler(req: Req, res: Res) {
       const r = await rpc('claim_order_notification', { p_invoice_number: inv, p_phone: phone });
       if (!r.ok) return res.status(502).json({ ok: false, error: 'failed' });
       if (!r.data) return res.status(200).json({ ok: true, skipped: true });
-      const { order, customer, recent_for_email } = r.data as { order: Order; customer: Cust; recent_for_email?: number };
+      const { order, customer, recent_for_email, recent_total } = r.data as { order: Order; customer: Cust; recent_for_email?: number; recent_total?: number };
       const sent = [await send(env('OWNER_EMAIL'), ownerMail(order, { ...customer, name: clean(customer.name, 120), address: clean(customer.address, 400) }))];
-      // Anyone can type any email at checkout, so cap confirmations per recipient (anti-spam) and only send sanitised text.
-      if (customer.email && EMAIL.test(customer.email) && (recent_for_email ?? 0) <= 3)
-        sent.push(await send(customer.email, confirmMail(order, { ...customer, name: clean(customer.name, 60), address: clean(customer.address, 200) })));
+      // Anyone can type any email at checkout, so cap confirmations per (normalised) recipient and globally per hour; the customer email carries no customer-typed text.
+      if (customer.email && EMAIL.test(customer.email) && (recent_for_email ?? 0) <= 3 && (recent_total ?? 0) <= 40)
+        sent.push(await send(customer.email, confirmMail(order, customer)));
       return res.status(200).json({ ok: true, sent: sent.filter(Boolean).length });
     }
     if (b.type === 'status') {
@@ -120,7 +120,7 @@ export default async function handler(req: Req, res: Res) {
       const o = (r.data as (Order & { customer: Cust })[]).find(x => x.invoice_number === inv);
       if (!o) return res.status(404).json({ ok: false, error: 'not found' });
       if (!o.customer?.email || !EMAIL.test(o.customer.email)) return res.status(200).json({ ok: true, skipped: true });
-      return res.status(200).json({ ok: true, sent: (await send(o.customer.email, statusMail(o, { ...o.customer, name: clean(o.customer.name, 60), address: clean(o.customer.address, 200) }))) ? 1 : 0 });
+      return res.status(200).json({ ok: true, sent: (await send(o.customer.email, statusMail(o, o.customer))) ? 1 : 0 });
     }
     return res.status(400).json({ ok: false, error: 'bad request' });
   } catch {
