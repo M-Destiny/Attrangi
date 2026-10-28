@@ -4,9 +4,9 @@ alter table public.invoices add column if not exists notified_at timestamptz;
 -- Normalises an address for throttling: lower-case, drop "+tag", and (Gmail) drop dots so variants count as one recipient.
 create or replace function public.norm_email(e text) returns text language sql immutable set search_path = public, pg_temp as $$
   select case when e is null then null
-    when split_part(lower(trim(e)), '@', 2) in ('gmail.com', 'googlemail.com')
+    when rtrim(split_part(lower(trim(e)), '@', 2), '.') in ('gmail.com', 'googlemail.com')
       then replace(split_part(split_part(lower(trim(e)), '@', 1), '+', 1), '.', '') || '@gmail.com'
-    else split_part(split_part(lower(trim(e)), '@', 1), '+', 1) || '@' || split_part(lower(trim(e)), '@', 2) end;
+    else split_part(split_part(lower(trim(e)), '@', 1), '+', 1) || '@' || rtrim(split_part(lower(trim(e)), '@', 2), '.') end;
 $$;
 
 -- Atomically claims the one-time "new order" notification. Returns order + customer + throttle counters, or null
@@ -33,7 +33,8 @@ begin
     select count(*) into v_recent from invoices i2 join customers c2 on c2.id = i2.customer_id
      where public.norm_email(c2.email) = public.norm_email(c.email) and i2.notified_at > now() - interval '1 hour';
   end if;
-  select count(*) into v_total from invoices where notified_at > now() - interval '1 hour';  -- global cap input
+  select count(*) into v_total from invoices i3 join customers c3 on c3.id = i3.customer_id
+   where i3.notified_at > now() - interval '1 hour' and c3.email is not null;  -- global cap input: only orders that have an email
   return jsonb_build_object('order', public._order_public(r), 'recent_for_email', v_recent, 'recent_total', v_total,
     'customer', jsonb_build_object('name', c.name, 'email', c.email, 'phone', c.phone, 'address', c.address));
 end $$;

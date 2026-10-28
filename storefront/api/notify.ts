@@ -18,7 +18,7 @@ const SITE = () => env('SITE_URL', 'https://attrangii-store.vercel.app').replace
 export const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const inr = (n: number) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const label = (s: string) => (s || '').replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
-const EMAIL = /^[^\s@<>"',;]{1,64}@[^\s@<>"',;]{1,255}\.[^\s@<>"',;]{2,}$/;
+const EMAIL = /^[A-Za-z0-9._%+-]{1,64}@(?:[A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,24}$/;  // strict ASCII hostname form: no trailing dot, no extra @, no punycode tricks
 const safeHttp = (u: string | null) => (u && /^https?:\/\//i.test(u) && u.length < 500 ? u : null);
 const trackUrl = (inv: string) => `${SITE()}/track?invoice=${encodeURIComponent(inv)}`;
 
